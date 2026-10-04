@@ -1,0 +1,14 @@
+# Generated caches and local tooling
+.fallow/
+.vscode/
+.idea/
+.DS_Store
+
+# Secrets
+.env
+.env.*
+*.jks
+*.keystore
+key.properties
+google-services.json
+GoogleService-Info.plist
