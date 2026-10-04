@@ -12,3 +12,6 @@
 key.properties
 google-services.json
 GoogleService-Info.plist
+
+# Source material kept local only
+reference/
