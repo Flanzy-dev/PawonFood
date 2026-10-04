@@ -1,0 +1,38 @@
+[
+  {
+    "id": "c1", "listingId": "l_ayam", "receiverId": "me", "providerId": "p_siti", "unread": 1,
+    "offer": {"amount": 4000, "status": "accepted", "portions": 1},
+    "pickup": {"code": "PWN-4821", "status": "waiting"},
+    "messages": [
+      {"from": "me", "type": "offer", "amount": 4000, "text": "Tawaran Rp4.000 · 1 porsi", "minutesAgo": 12},
+      {"from": "me", "type": "text", "text": "Bu, boleh Rp4.000? Saya bisa ambil sekarang.", "minutesAgo": 12},
+      {"from": "p_siti", "type": "text", "text": "Boleh, Mas. Ambil sebelum {pickupBy} ya.", "minutesAgo": 8},
+      {"from": "system", "type": "system", "text": "Tawaran Rp4.000 diterima. Kode ambil PWN-4821.", "minutesAgo": 8}
+    ]
+  },
+  {
+    "id": "c2", "listingId": "l_lodeh", "receiverId": "me", "providerId": "p_wulan", "unread": 0,
+    "offer": {"amount": 0, "status": "accepted", "portions": 1},
+    "pickup": {"code": "PWN-3307", "status": "waiting"},
+    "messages": [
+      {"from": "me", "type": "text", "text": "Bu, sayur lodehnya saya ambil ya.", "minutesAgo": 130},
+      {"from": "p_wulan", "type": "text", "text": "Sudah saya taruh di meja teras.", "minutesAgo": 100},
+      {"from": "system", "type": "system", "text": "Ambil gratis disetujui. Kode ambil PWN-3307.", "minutesAgo": 100}
+    ]
+  },
+  {
+    "id": "c3", "listingId": "l_nasitelur_habis", "receiverId": "me", "providerId": "p_barokah", "unread": 0, "closedSoldOut": true,
+    "messages": [
+      {"from": "me", "type": "text", "text": "Masih ada nasi telurnya, Mas?", "minutesAgo": 1510},
+      {"from": "p_barokah", "type": "text", "text": "Maaf, barusan sudah diambil.", "minutesAgo": 1500}
+    ]
+  },
+  {
+    "id": "c4", "listingId": "l_own", "receiverId": "p_dina", "providerId": "me", "unread": 1,
+    "offer": {"amount": 3000, "status": "pending", "portions": 1},
+    "messages": [
+      {"from": "p_dina", "type": "offer", "amount": 3000, "text": "Tawaran Rp3.000 · 1 porsi", "minutesAgo": 6},
+      {"from": "p_dina", "type": "text", "text": "Kak, boleh Rp3.000? Aku ambil habis kuliah.", "minutesAgo": 6}
+    ]
+  }
+]
