@@ -7,6 +7,7 @@ import '../../core/data/chat_repository.dart';
 import '../../core/data/listings_repository.dart';
 import '../../core/data/providers.dart';
 import '../../core/mock/mock_data.dart';
+import '../../core/motion/pressable.dart';
 import '../../core/models/listing.dart';
 import '../../core/services/formatters.dart';
 import '../../core/services/geo.dart';
@@ -15,7 +16,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/avatar.dart';
-import '../../core/widgets/form_controls.dart';
 import '../../core/widgets/info_blocks.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/listing_photo.dart';
@@ -34,51 +34,53 @@ class ListingDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
-  var _consent = false;
-  var _consentError = false;
+  var _busy = false;
 
-  bool _requireConsent() {
-    if (_consent) return true;
-    setState(() => _consentError = true);
-    return false;
+  /// One navigation at a time: a double tap on "Ambil" or a quick offer used to claim twice and open two chats.
+  void _open(String path) {
+    _busy = true;
+    context.push(path).whenComplete(() => _busy = false);
   }
 
-  void _chat(Listing l) => context.push('/chat/${ref.read(chatProvider.notifier).openForListing(l.id)}');
+  void _chat(Listing l) {
+    if (_busy) return;
+    _open('/chat/${ref.read(chatProvider.notifier).openForListing(l.id)}');
+  }
 
   void _claim(Listing l) {
-    if (!_requireConsent()) return;
-    context.push('/chat/${ref.read(chatProvider.notifier).claim(l.id)}');
+    if (_busy) return;
+    _open('/chat/${ref.read(chatProvider.notifier).claim(l.id)}');
   }
 
-  void _offer(Listing l, int amount) {
-    if (!_requireConsent()) return;
+  void _offer(Listing l, int amount, {int portions = 1, String message = ''}) {
+    if (_busy) return;
     final chat = ref.read(chatProvider.notifier);
     final id = chat.openForListing(l.id);
-    final error = chat.sendOffer(id, amount);
+    final error = chat.sendOffer(id, amount, portions: portions, message: message);
     if (error != null) {
       showAppSnack(context, error);
       return;
     }
-    context.push('/chat/$id');
+    _open('/chat/$id');
   }
 
   Future<void> _customOffer(Listing l) async {
-    final amount = await showOfferSheet(context, price: l.price);
-    if (amount != null && mounted) _offer(l, amount);
+    final draft = await showOfferSheet(context, listing: l);
+    if (draft != null && mounted) _offer(l, draft.amount, portions: draft.portions, message: draft.message);
   }
 
   @override
   Widget build(BuildContext context) {
     final l = ref.watch(listingByIdProvider(widget.listingId));
     if (l == null) {
-      return Scaffold(appBar: AppBar(), body: const Center(child: Text('Listing tidak ditemukan')));
+      return const NotFoundScaffold(title: 'Makanan tidak ditemukan', fallback: '/', actionLabel: 'Ke Beranda');
     }
     final here = ref.watch(locationProvider).position;
     final now = ref.watch(clockProvider)();
     final distance = distanceMeters(here, l.position);
-    final conv = ref.watch(chatProvider.select((all) => all.where((c) => c.listingId == l.id && c.receiverId == meId && c.pickup != null).firstOrNull));
+    final conv = ref.watch(chatProvider.select((all) => all.where((c) => c.listingId == l.id && c.receiverId == meId && (c.pickup?.open ?? false)).firstOrNull));
     final catParts = l.category.label.split(' ');
-    final canOffer = l.negotiable && !l.isFree && !l.isOwn && !l.isSoldOut;
+    final canOffer = l.negotiable && !l.isFree && !l.isOwn && !l.isSoldOut && !l.isExpired(now);
     final quick = quickOffers(l.price);
     final top = MediaQuery.paddingOf(context).top;
 
@@ -95,7 +97,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     height: 272,
                     child: Stack(
                       children: [
-                        Positioned.fill(child: ListingPhoto(l, radius: 0)),
+                        Positioned.fill(child: Semantics(image: true, label: 'Foto ${l.name}', child: ListingPhoto(l, radius: 0))),
                         const Positioned(
                           top: 0,
                           left: 0,
@@ -113,9 +115,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                         Positioned(
                           left: 16,
                           bottom: 14,
-                          child: Row(children: [
+                          right: 16,
+                          // Wrap: at large text or 360 dp the two badges go on two lines instead of overflowing.
+                          child: Wrap(spacing: 8, runSpacing: 6, children: [
                             StockBadge(l.portionsLeft, height: 32, size: 14),
-                            const SizedBox(width: 8),
                             const Pill('Foto asli, dicek AI', fill: AppColors.surface, icon: LucideIcons.shieldCheck, height: 32, size: 14, weight: 700, hPad: 14),
                           ]),
                         ),
@@ -139,14 +142,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                                 children: [
                                   Text(l.provider.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.display(18, weight: 700, height: 24)),
                                   const SizedBox(height: 4),
-                                  Row(children: [
+                                  Wrap(spacing: 10, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                                     TierTag(l.provider.tier),
-                                    if (l.provider.rating > 0) ...[
-                                      const SizedBox(width: 10),
-                                      const Icon(Icons.star_rounded, size: 18, color: AppColors.accent),
-                                      const SizedBox(width: 4),
-                                      Text(formatRating(l.provider.rating), style: AppTypography.text(14, weight: 600)),
-                                    ],
+                                    if (l.provider.rating > 0)
+                                      Row(mainAxisSize: MainAxisSize.min, children: [
+                                        const Icon(Icons.star_rounded, size: 18, color: AppColors.accent),
+                                        const SizedBox(width: 4),
+                                        Text(formatRating(l.provider.rating), style: AppTypography.text(14, weight: 600)),
+                                      ]),
                                   ]),
                                 ],
                               ),
@@ -154,14 +157,17 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Row(
+                        IntrinsicHeight(
+                          child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(child: StatTile(label: 'Jarak', value: formatDistance(distance), caption: 'jalan kaki')),
+                            Expanded(child: StatTile(label: 'Jarak', value: formatDistance(distance), caption: 'area ${areaOf(l.position)}')),
                             const SizedBox(width: 8),
                             Expanded(child: StatTile(label: 'Ambil sebelum', value: formatTime(l.pickupBy), caption: dayCaption(l.pickupBy, now))),
                             const SizedBox(width: 8),
                             Expanded(child: StatTile(label: 'Kategori', value: catParts.first, caption: catParts.skip(1).join(' '))),
                           ],
+                        ),
                         ),
                         const SizedBox(height: 12),
                         PriceBox(price: l.price, originalPrice: l.originalPrice, negotiable: l.negotiable),
@@ -179,26 +185,11 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                             ],
                           ),
                         ],
-                        if (!l.isOwn && !l.isSoldOut) ...[
-                          const SizedBox(height: 12),
-                          AppCheckbox(
-                            value: _consent,
-                            textSize: 13,
-                            label: 'Saya telah memeriksa kondisi makanan dan membebaskan PawonFood dari tuntutan kesehatan.',
-                            onChanged: (v) => setState(() {
-                              _consent = v;
-                              if (v) _consentError = false;
-                            }),
-                          ),
-                          if (_consentError)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Row(children: [
-                                const Icon(LucideIcons.triangleAlert, size: 16, color: AppColors.error),
-                                const SizedBox(width: 6),
-                                Expanded(child: Text('Centang persetujuan dulu untuk melanjutkan.', style: AppTypography.text(13, weight: 600, color: AppColors.error))),
-                              ]),
-                            ),
+                        if (l.description != null) ...[
+                          const SizedBox(height: 20),
+                          Text('Deskripsi', style: AppTypography.display(16, weight: 700, height: 22)),
+                          const SizedBox(height: 6),
+                          Text(l.description!, style: AppTypography.text(14, height: 21, color: AppColors.inkMuted)),
                         ],
                       ],
                     ),
@@ -207,17 +198,19 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               ),
             ),
           ),
-          StickyBottomBar(child: _bottomActions(l, conv != null)),
+          StickyBottomBar(child: _bottomActions(l, conv != null, now)),
         ],
       ),
     );
   }
 
-  Widget _bottomActions(Listing l, bool hasPickup) {
+  Widget _bottomActions(Listing l, bool hasPickup, DateTime now) {
     if (l.isOwn) return AppButton(label: 'Lihat pesan', onPressed: () => context.go('/messages'));
     if (l.isSoldOut) return const AppButton(label: 'Habis', onPressed: null);
+    // Reached by a link or from an old chat: the pickup window is over, so there is nothing to claim.
+    if (!hasPickup && l.isExpired(now)) return const AppButton(label: 'Waktu ambil sudah lewat', onPressed: null);
     if (hasPickup) {
-      return ActionPair(secondaryLabel: 'Chat', secondaryIcon: LucideIcons.messageSquare, onSecondary: () => _chat(l), primaryLabel: 'Lihat kode ambil', onPrimary: () => _chat(l));
+      return ActionPair(secondaryLabel: 'Chat', secondaryIcon: LucideIcons.messageSquare, onSecondary: () => _chat(l), primaryLabel: 'Lihat reservasi', onPrimary: () => _chat(l));
     }
     return ActionPair(
       secondaryLabel: 'Chat',
@@ -236,10 +229,13 @@ class _OfferChip extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.border)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(onTap: onTap, child: Container(height: 54, alignment: Alignment.center, child: Text(label, style: AppTypography.text(15, weight: 700)))),
+  Widget build(BuildContext context) => Pressable(
+        scale: 0.95,
+        child: Material(
+          color: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.border)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(onTap: onTap, child: Container(height: 54, alignment: Alignment.center, child: Text(label, style: AppTypography.text(15, weight: 700)))),
+        ),
       );
 }

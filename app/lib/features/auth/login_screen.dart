@@ -82,7 +82,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () => showAppSnack(context, 'Reset password segera hadir.'),
+                onPressed: () => context.push('/forgot'),
                 style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
                 child: Text('Lupa password?', style: AppTypography.text(14, weight: 700, color: AppColors.primary)),
               ),

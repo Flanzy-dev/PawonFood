@@ -1,4 +1,3 @@
-import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
@@ -107,9 +106,10 @@ void main() {
       expect(Validators.pickupTime(fixedNow.add(const Duration(minutes: 1)), fixedNow), isNull);
     });
 
-    test('offer amount must be positive and not above the price', () {
+    test('offer amount must be positive and below the price', () {
       expect(Validators.offerAmount(null, 5000), 'Masukkan nominal tawaran');
-      expect(Validators.offerAmount(6000, 5000), 'Tawaran tidak boleh melebihi harga');
+      expect(Validators.offerAmount(6000, 5000), 'Tawaran harus di bawah Rp5.000. Mau harga penuh? Pakai tombol Ambil.');
+      expect(Validators.offerAmount(5000, 5000), isNotNull);
       expect(Validators.offerAmount(3000, 5000), isNull);
     });
   });
@@ -151,10 +151,9 @@ void main() {
       expect((r as OfferCountered).amount, 5000);
     });
 
-    test('quick offers and pickup codes', () {
+    test('quick offers', () {
       expect(quickOffers(5000), [3000, 4000]);
       expect(quickOffers(500), isEmpty);
-      expect(generatePickupCode(Random(3)), matches(RegExp(r'^PWN-\d{4}$')));
     });
   });
 
@@ -188,8 +187,8 @@ void main() {
 
   group('food label', () {
     final all = loadMockData().listings;
-    final ayam = all.firstWhere((l) => l.id == 'l_ayam'); // Pahlawan Pangan provider, cooked 30 min ago, 2 portions
-    final lodeh = all.firstWhere((l) => l.id == 'l_lodeh'); // Sobat Pawon provider, cooked 45 min ago
+    final ayam = all.firstWhere((l) => l.id == 'l_ayam'); // Pawon Hero provider, cooked 30 min ago, 2 portions
+    final lodeh = all.firstWhere((l) => l.id == 'l_lodeh'); // Pawon Friend provider, cooked 45 min ago
     final sayur = all.firstWhere((l) => l.id == 'l_sayur'); // raw ingredients, never cooked
 
     test('a top-tier provider is Populer', () => expect(foodLabelFor(ayam, fixedNow), FoodLabel.populer));

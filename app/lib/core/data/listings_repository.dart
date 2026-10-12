@@ -18,6 +18,9 @@ class PublishDraft {
     required this.negotiable,
     required this.pickupBy,
     required this.pickupPoint,
+    this.pickupPosition,
+    this.description,
+    this.bestBefore,
     this.photoPath,
     this.aiConfidence = 0,
     this.aiStatus = AiStatus.approved,
@@ -30,6 +33,11 @@ class PublishDraft {
   final bool negotiable;
   final DateTime pickupBy;
   final String pickupPoint;
+
+  /// Where the pickup point is; null keeps the demo position near Pogung.
+  final LatLng? pickupPosition;
+  final String? description;
+  final DateTime? bestBefore;
   final String? photoPath;
   final double aiConfidence;
   final AiStatus aiStatus;
@@ -82,7 +90,9 @@ class ListingsNotifier extends Notifier<List<Listing>> {
       negotiable: d.negotiable,
       pickupBy: d.pickupBy,
       pickupPoint: d.pickupPoint,
-      position: LatLng(pogung.latitude - 0.0001 * (own + 1), pogung.longitude + 0.0002 * (own + 1)),
+      position: d.pickupPosition ?? LatLng(pogung.latitude - 0.0001 * (own + 1), pogung.longitude + 0.0002 * (own + 1)),
+      description: d.description,
+      bestBefore: d.bestBefore,
       aiStatus: d.aiStatus,
       aiConfidence: d.aiConfidence,
       cookedAt: now,
@@ -116,17 +126,20 @@ final locationProvider = NotifierProvider<LocationNotifier, SavedLocation>(Locat
 /// Search radius in meters (1 km by default, "Perluas radius ke 2 km" sets 2 km).
 final radiusMetersProvider = StateProvider<double>((ref) => walkableRadiusMeters);
 
+/// Filter chips of the full list (B5b). Beranda filters by [categoryFilterProvider] instead.
 enum FeedFilter {
   walkable('Bisa jalan kaki'),
   warm('Sedang hangat'),
-  free('Makan gratis'),
-  raw('Bahan mentah');
+  free('Makan gratis');
 
   const FeedFilter(this.label);
   final String label;
 }
 
 final feedFiltersProvider = StateProvider<Set<FeedFilter>>((ref) => {FeedFilter.walkable});
+
+/// Beranda category chip (All · Ready-to-Eat · Fresh Ingredient · Sealed Food). Null is "All".
+final categoryFilterProvider = StateProvider<FoodCategory?>((ref) => null);
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
@@ -144,6 +157,7 @@ final feedProvider = Provider<List<FeedItem>>((ref) {
   final here = ref.watch(locationProvider).position;
   final radius = ref.watch(radiusMetersProvider);
   final filters = ref.watch(feedFiltersProvider);
+  final category = ref.watch(categoryFilterProvider);
   final query = ref.watch(searchQueryProvider).trim().toLowerCase();
   final items = <FeedItem>[];
   for (final l in ref.watch(listingsProvider)) {
@@ -153,7 +167,7 @@ final feedProvider = Provider<List<FeedItem>>((ref) {
     if (filters.contains(FeedFilter.walkable) && d > walkableRadiusMeters) continue;
     if (filters.contains(FeedFilter.warm) && !l.isWarm(now)) continue;
     if (filters.contains(FeedFilter.free) && !l.isFree) continue;
-    if (filters.contains(FeedFilter.raw) && l.category != FoodCategory.bahanMentah) continue;
+    if (category != null && l.category != category) continue;
     if (query.isNotEmpty && !l.name.toLowerCase().contains(query) && !l.provider.name.toLowerCase().contains(query)) continue;
     items.add(FeedItem(l, d));
   }

@@ -1,0 +1,13 @@
+interface:
+  display_name: Stop Slop
+  short_description: Remove predictable AI writing patterns
+  default_prompt: Use $stop-slop to make this prose direct, natural, and specific.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

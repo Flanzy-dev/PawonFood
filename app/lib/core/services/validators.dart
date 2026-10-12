@@ -1,3 +1,5 @@
+import 'formatters.dart';
+
 /// Input validation (AGENTS.md: price >= 0, portions >= 1, pickup time in the future). Messages are Indonesian.
 abstract final class Validators {
   static final _email = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
@@ -19,15 +21,19 @@ abstract final class Validators {
     return null;
   }
 
+  /// A new password must pass [password] and differ from the old one (A4e, D18i).
+  static String? newPassword(String? v, {String? old}) => password(v) ?? (old != null && v == old ? 'Password baru harus berbeda dari yang lama' : null);
+
   static String? price(int? v) => (v == null || v < 0) ? 'Harga tidak boleh negatif' : null;
 
   static String? portions(int? v) => (v == null || v < 1) ? 'Minimal 1 porsi' : null;
 
   static String? pickupTime(DateTime? t, DateTime now) => (t == null || !t.isAfter(now)) ? 'Jam ambil harus di masa depan' : null;
 
+  /// An offer must be above Rp0 and below the listed price; the full price goes through "Ambil" (PRD Core Feature 3).
   static String? offerAmount(int? amount, int price) {
     if (amount == null || amount <= 0) return 'Masukkan nominal tawaran';
-    if (amount > price) return 'Tawaran tidak boleh melebihi harga';
+    if (amount >= price) return 'Tawaran harus di bawah ${formatRupiah(price)}. Mau harga penuh? Pakai tombol Ambil.';
     return null;
   }
 }

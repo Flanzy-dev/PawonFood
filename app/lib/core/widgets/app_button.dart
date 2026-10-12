@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../motion/entrance.dart';
+import '../motion/pressable.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
-enum AppButtonVariant { primary, outline, accent, ghost, light }
+enum AppButtonVariant { primary, outline, accent, ghost, light, danger }
 
 /// Buttons from DESIGN_SYSTEM.md: primary (filled green), outline (green), accent outline (terracotta),
-/// ghost (sand) and light (cream, for dark screens). 16 radius, 52–56 tall.
+/// ghost (sand), light (cream, for dark screens) and danger (filled red, for destructive confirmations). 16 radius, 52–56 tall.
 class AppButton extends StatelessWidget {
   const AppButton({
     super.key,
@@ -48,8 +50,9 @@ class AppButton extends StatelessWidget {
             AppButtonVariant.accent => (AppColors.surface, AppColors.accentInk, AppColors.accent),
             AppButtonVariant.ghost => (AppColors.surfaceSand, AppColors.ink, null),
             AppButtonVariant.light => (AppColors.background, AppColors.cameraBg, null),
+            AppButtonVariant.danger => (AppColors.error, AppColors.surface, null),
           };
-    final child = loading
+    final Widget content = loading
         ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: fg))
         : iconOnly && icon != null
             ? Icon(icon, size: 22, color: fg)
@@ -64,14 +67,24 @@ class AppButton extends StatelessWidget {
       button: true,
       enabled: enabled,
       label: label,
-      child: SizedBox(
-        width: expand ? double.infinity : null,
-        height: height,
-        child: Material(
-          color: bg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: border == null ? BorderSide.none : BorderSide(color: border, width: 1.5)),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(onTap: enabled ? onPressed : null, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Center(child: child))),
+      child: Pressable(
+        enabled: enabled,
+        child: SizedBox(
+          width: expand ? double.infinity : null,
+          height: height,
+          child: Material(
+            color: bg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: border == null ? BorderSide.none : BorderSide(color: border, width: 1.5)),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: enabled ? onPressed : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                // The label cross-fades to the spinner (and back) instead of snapping.
+                child: Center(child: FadeSwitch(alignment: Alignment.center, child: KeyedSubtree(key: ValueKey(loading), child: content))),
+              ),
+            ),
+          ),
         ),
       ),
     );

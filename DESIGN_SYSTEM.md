@@ -22,7 +22,8 @@ Warm, earthy and trustworthy, like a home kitchen ("dapur rumahan").
 --surface:        #FFFFFF   /* cards, inputs, sheets */
 --surface-sand:   #F3EBDE   /* points pill, price box, inactive segment, quantity "−" */
 --map-sand:       #E8DDC9   /* map base */
---border:         #E5DED1   /* card, input and chip outlines */
+--border:         #E5DED1   /* card and chip edges, dividers (decorative) */
+--border-strong:  #8A8578   /* outline of controls: checkbox, radio, switch, text fields (3.4:1 on cream, WCAG 1.4.11) */
 --accent:         #B15732   /* terracotta: "Sisa N porsi" badge, map pins, star rating, paid price pin outline */
 --accent-ink:     #6F2B18   /* "Bisa ditawar" pill text, "Tawar lagi" outline text */
 --success-tint:   #E3EDE4   /* tier tags, category tag, accepted-offer card */
@@ -74,6 +75,8 @@ States for every interactive component: default, pressed, focused, disabled, loa
 #### Navigation
 
 - *Bottom nav*: 5 items (Beranda, Peta, **Bagikan**, Pesan, Profil).
+  - 68 dp tall plus the system gesture inset. The mockups draw the inset as a 24 px area under the bar with the Android
+    gesture handle (a 108 x 4 pill, 8 px above the bottom edge) on every phone screen.
   - Bagikan is a raised green circular FAB with the PawonFood logo.
   - The active item is green with a bold label; inactive items use `--ink-muted`.
 - *Top bar*: back button (white circle), centered title, optional action.
@@ -86,7 +89,7 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - *Text input*: white, 16 radius, border; error text below.
 - *Quantity stepper*: "−" sand circle, value, "+" green circle.
 - *Segmented control*: Gratis / Jual murah. Sand track; the selected segment is white.
-- *Price input*: "Rp" prefix and "/porsi" suffix, plus the "Boleh ditawar" checkbox.
+- *Price input*: full-width field with "Rp" prefix and "/porsi" suffix. Under it sits the "Boleh ditawar" checkbox row with a muted line "Pembeli bisa ajukan harga lewat chat" (`AppCheckbox.helper`).
 - *Time chips*: equal-width options (19.00 / 20.30 / 22.00). The selected chip is filled green.
 
 #### Buttons
@@ -110,14 +113,19 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - *Price box*: sand panel showing the struck-through and current price, plus a "Bisa ditawar" pill.
 - *Quick-offer chips*: 3 equal outlined buttons (Rp3.000 / Rp4.000 / Tulis sendiri).
 - *Avatar*: green circle with cream initials (e.g. "BS").
-- *Mini-map card*: map sand background, dashed green 1 km radius, user dot, provider pins, a "Radius 1 km · bisa jalan kaki" label and a CTA.
+- *Mini-map card*: map sand background, dashed green 1 km radius, user dot, up to two price pins ("Rp5.000",
+  "Gratis"; a small dot marks the spot and the pill sits beside it, clear of the other overlays), a "Radius 1 km ·
+  bisa jalan kaki" label and a round green 48 px button bottom-right with the
+  fluent:full-screen-maximize-16-filled icon (accessible label "Lihat peta penuh").
 
 #### Chat
 
 - *Own bubble*: green with white text. *Other bubble*: white with a border. Timestamps sit below in caption style.
 - *Offer bubble*: a green card with "Tawaran kamu", a big price and details.
-- *Accepted card*: `--success-tint` panel with a check icon, "Tawaran Rp4.000 diterima", the pickup code in a white
-  monospace box (PWN-4821) and a "Sudah saya ambil" button.
+- *Reservation card*: `--success-tint` panel with a check icon and "Tawaran Rp4.000 diterima". It carries the next
+  step: "Pilih cara bayar" (+ "Lihat rute") until a payment method is chosen, then "Pindai QR" (+ "Lihat rute"), with
+  a dark "Lunas" tag when paid by QRIS. The provider sees "Buka QR ambil". No pickup code.
+- *Waiting card*: tint panel "Menunggu jawaban [penyedia]" with "Batalkan tawaran" while an offer is pending.
 - *Quick replies*: outlined pills (Saya OTW / Masih ada? / Tawar lagi).
 - *Composer*: rounded input and a green circular send button.
 - *Thread row*: avatar, name, time, item · price, last message, plus a status label (Tawaran diterima / Siap diambil / Habis).
@@ -125,8 +133,8 @@ States for every interactive component: default, pressed, focused, disabled, loa
 
 #### Profile
 
-- *Level card*: shows the current tier and points, the "[X] poin lagi" text, and a 3-step tier track
-  (Sekarang / Berikutnya / Puncak).
+- *Level card*: shows the current tier and points, the "[X] poin lagi" text, and a tier stepper: a line through three
+  dots with the caption and tier name under each (Sekarang / Berikutnya / Top Impact).
 - *Impact stats*: 3 big numbers (porsi dibagikan, porsi diselamatkan, kg batal jadi sampah).
 - *Reward row*: icon, title, cost and a "Tukar" button.
 - *Settings list rows*.
@@ -138,6 +146,42 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - Status row: check icon and "Makanan terdeteksi, siap difoto".
 - Large cream shutter button, with "Tips foto" and "Balik" on either side.
 - While inference runs, show "AI sedang memindai..." with a green scan line moving up and down over the photo.
+
+## Motion
+
+Purposeful and quiet: motion explains a change (what appeared, what was pressed, where a screen came from). No
+confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/motion.dart`.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| fast | 150 ms | press feedback, small colour changes, toggles |
+| base | 220 ms | chips, tabs, segmented thumb, radio dots, tab fades, cross-fades |
+| slow | 320 ms | page pushes, sheets, cards appearing, success marks |
+| stagger | 40 ms per item, max 8 items | list entrances |
+| enter / exit / move | easeOutCubic / easeInCubic / easeInOutCubic | arriving / leaving / moving between positions |
+| pop | easeOutBack | only small things: check marks, radio dots, a selected map pin. Things that pop start at 50-60 % scale with a fade, never from zero |
+
+- **Press feedback:** buttons, chips and cards shrink to 0.97 (cards 0.98, icon buttons 0.92) while pressed and spring
+  back on release. The shrink lets go as soon as the finger drags past the touch slop, so scrolling over a card never presses it.
+- **Pages:** drill-in screens fade in while sliding 6% from the right; task flows (camera, scanner, payment, map
+  picker) rise from below; result and auth screens cross-fade. Tabs fade through quickly (150 ms), with no movement.
+- **Lists:** items rise 12 px and fade in, staggered, only on a screen's first appearance (not on scroll or filter).
+- **State changes:** cards and notes cross-fade (`FadeSwitch`); the segmented thumb slides; numbers count up
+  (points, impact, "+10 poin"); progress bars fill.
+- **Success:** on full success screens (Pembayaran berhasil, Makanan terselamatkan!, Makananmu sudah tayang!,
+  Voucher berhasil diklaim!) and on a successful QR scan, `--primary` floods the screen from the check (520 ms),
+  holds while a large cream check draws (400 ms), then shrinks back into the round badge (560 ms, `exit`: it speeds
+  up and stops dead at the badge, no slow landing), which plays one soft ring. The scan flood shrinks away into the
+  viewfinder the same way and opens onto the review screen. This is the one
+  deliberate large-surface motion; it never uses `pop`, absorbs taps while up, and never plays before a failure
+  (an expired scan gets no green). Inline checks (the route arrival) just pop the circle and draw the check.
+  Failure and clock marks pop in.
+- **Live states:** AI scan line and QR scan line sweep; "Menunggu ... memindai" fades in and out (opacity, never size); the scanner corners stay still;
+  typing dots while an offer waits; the route marker walks along the path.
+- **Welcome hero:** three food photos slide every 4 s (`slow`, `move`) with page dots under the photo; a manual swipe
+  resets the timer, and the slide never starts under a finger or while another screen covers Welcome. It is the one sanctioned loop and does not auto-advance under reduced motion.
+- **Reduced motion:** when the OS "remove animations" setting is on, every animation is skipped and final values show
+  at once (`Motion.reduced`). Widget tests run in this mode.
 
 ## Map
 
@@ -153,8 +197,9 @@ States for every interactive component: default, pressed, focused, disabled, loa
 
 - Casual Indonesian addressed as "kamu". Short, warm and practical.
   Examples: "Lapar? Masih ada yang hangat di dekatmu.", "Semua sudah diisi. Cek sebentar, lalu bagikan."
-- Tiers: **Sobat Pawon → Food Savior → Pahlawan Pangan**. Never use "Borjuis".
-- Categories: *Lauk matang*, *Bahan mentah*. Filters: *Bisa jalan kaki*, *Sedang hangat*, *Makan gratis*.
+- Tiers: **Pawon Friend → Pawon Elite → Pawon Hero**. Never use "Borjuis".
+- Category chips (Beranda and Peta, intentionally English): *All*, *Ready-to-Eat*, *Fresh Ingredient*, *Sealed Food*.
+  Filters (Semua makanan only): *Bisa jalan kaki*, *Sedang hangat*, *Makan gratis*.
 - Prices: `Rp5.000` (dot thousands separator). Times: `20.30` (dot). Distance: `300 m`, `± 4 mnt jalan kaki`.
 
 ## Landing Page
@@ -190,7 +235,11 @@ Sections of `PawonFood UI.pdf`, from top to bottom:
 
 ## Accessibility
 
-- Touch targets are at least 44×44pt; chips and quick replies are at least 40pt tall.
+- Touch targets are at least 44×44pt (map locate and ad close buttons 48). The one deliberate exception is the filter chip row (40pt tall, as in Figma).
+- Control outlines (checkbox, radio, switch, text fields) use `--border-strong`, at least 3:1 against the surface; `--border` is only for card edges and dividers.
+- Large text: no fixed heights on text containers. Cards whose text blocks are stacked (food cards, impact tiles, search field) size themselves with `textScaleOf(context)`; tab labels stop growing at 1.3×; rows use `Flexible`/`Wrap`; sheets and the Welcome sheet scroll when they outgrow the screen.
+- Irreversible actions ask first with `confirmAction` (Keluar, Tolak tawaran, Batalkan tawaran). Buttons that start a navigation or a payment guard against a second tap.
+- Rows built on `InkWell` inside `Semantics(excludeSemantics: true)` must also set `Semantics.onTap`, or screen readers cannot activate them.
 - Text on cream and white meets WCAG AA. Green `#2F5D39` on white or cream works for text and buttons.
 - Meaning is never carried by color alone: badges always include text ("Sisa 2 porsi", "✓ AI", "Gratis").
 - The camera screen announces the validation result as text, not only the bounding box color.

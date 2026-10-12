@@ -4,9 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/listings_repository.dart';
+import '../../core/motion/entrance.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_chip.dart';
+import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/food_card.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
@@ -77,12 +80,30 @@ class AllFoodScreen extends ConsumerWidget {
             ),
             Expanded(
               child: items.isEmpty
-                  ? Center(child: EmptyState(icon: LucideIcons.utensils, title: 'Belum ada makanan di radius $km km', body: 'Coba ubah filter di atas, atau perluas radius dari Beranda.'))
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) => FoodCard(listing: items[i].listing, distance: items[i].distance, onTap: () => context.push('/listing/${items[i].listing.id}')),
+                  ? Center(
+                      child: SingleChildScrollView(
+                        child: EmptyState(
+                          icon: LucideIcons.utensils,
+                          title: 'Belum ada makanan di radius $km km',
+                          body: 'Coba ubah filter di atas, atau perluas radius.',
+                          actions: [
+                            if (filters.isNotEmpty) AppButton(label: 'Hapus filter', onPressed: () => ref.read(feedFiltersProvider.notifier).state = {}),
+                            if (ref.watch(radiusMetersProvider) < 2000) AppButton(label: 'Perluas radius ke 2 km', variant: AppButtonVariant.outline, onPressed: () => expandRadius(ref)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : EntranceScope(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (context, i) => FadeSlideIn(
+                          key: ValueKey(items[i].listing.id),
+                          index: i,
+                          child: FoodCard(listing: items[i].listing, distance: items[i].distance, onTap: () => context.push('/listing/${items[i].listing.id}')),
+                        ),
+                      ),
                     ),
             ),
           ],
@@ -93,7 +114,7 @@ class AllFoodScreen extends ConsumerWidget {
 
   void _pickSort(BuildContext context, WidgetRef ref) {
     final current = ref.read(feedSortProvider);
-    showModalBottomSheet<void>(
+    showAppSheet<void>(
       context: context,
       useRootNavigator: true,
       showDragHandle: true,

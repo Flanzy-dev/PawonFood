@@ -12,6 +12,11 @@ abstract final class AppColors {
   static const surfaceSand = Color(0xFFF3EBDE);
   static const mapSand = Color(0xFFE8DDC9);
   static const border = Color(0xFFE5DED1);
+
+  /// Outline of controls (checkbox, radio, switch, text fields): 3.4:1 on cream, 3.7:1 on white (WCAG 1.4.11). [border] stays
+  /// for decorative card edges and dividers.
+  static const borderStrong = Color(0xFF8A8578);
+
   static const accent = Color(0xFFB15732);
   static const accentInk = Color(0xFF6F2B18);
   static const successTint = Color(0xFFE3EDE4);
@@ -24,8 +29,8 @@ abstract final class AppColors {
   static const mapRoad = Color(0xFFF4EEE0);
   static const mapBlock = Color(0xFFDDD1B9);
   static const mapPark = Color(0xFFD5DCB6);
-  static const avatarOlive = Color(0xFF6F8A38);
-  static const avatarTaupe = Color(0xFF8F7E5C);
+  static const avatarOlive = Color(0xFF5E752F);
+  static const avatarTaupe = Color(0xFF796B4E);
   static const cameraControl = Color(0xFF2A3530);
   static const cameraLine = Color(0xFF2E3A33);
   static const detectBox = Color(0xFFCFE3D0);

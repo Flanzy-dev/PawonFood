@@ -9,19 +9,12 @@ import '../../core/models/reward.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_chip.dart';
-import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/pills.dart';
 import '../../core/widgets/reward_card.dart';
 
-/// Opens the detail of a reward. The monthly certificate is not bought with points yet ("Segera hadir").
-void openReward(BuildContext context, Reward reward) {
-  if (!reward.claimable) {
-    showAppSnack(context, 'Segera hadir.');
-    return;
-  }
-  context.push('/reward/${reward.id}');
-}
+/// Opens the detail of a reward. The monthly certificate is not bought with points: it has its own detail (D19b).
+void openReward(BuildContext context, Reward reward) => context.push(reward.claimable ? '/reward/${reward.id}' : '/certificate');
 
 /// Semua / Belanja / Antar / Sertifikat chips; the selection is shared by Profil and the full catalog.
 class RewardFilterChips extends ConsumerWidget {
@@ -62,7 +55,8 @@ class RewardsScreen extends ConsumerWidget {
                 children: [
                   RoundIconButton(icon: LucideIcons.arrowLeft, semanticLabel: 'Kembali', onTap: () => context.canPop() ? context.pop() : context.go('/profile')),
                   Expanded(child: Text('Tukar poin', textAlign: TextAlign.center, style: AppTypography.text(17, weight: 700))),
-                  const SizedBox(width: 44),
+                  // Entry to D22b "Voucher saya" (the hi-fi has no slot for it yet).
+                  RoundIconButton(icon: LucideIcons.ticket, semanticLabel: 'Voucher saya', onTap: () => context.push('/vouchers')),
                 ],
               ),
             ),

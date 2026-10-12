@@ -30,6 +30,7 @@ List<Override> testOverrides() => [
       mockDataProvider.overrideWithValue(loadMockData()),
       clockProvider.overrideWithValue(() => fixedNow),
       simulatedReplyDelayProvider.overrideWithValue(Duration.zero),
+      simulatedScanDelayProvider.overrideWithValue(Duration.zero),
       randomProvider.overrideWithValue(Random(7)),
       tilesEnabledProvider.overrideWithValue(false),
     ];
@@ -40,11 +41,18 @@ ProviderContainer makeContainer() {
   return c;
 }
 
-/// Gives the test a 402 x 874 logical phone screen (the design frame).
+/// Gives the test a 402 x 874 logical phone screen (the design frame), with the OS "remove animations" setting on so
+/// looping motion (scan lines, pulses) stops and `pumpAndSettle` can settle.
 void usePhoneScreen(WidgetTester tester) {
   tester.view.physicalSize = const Size(1206, 2622);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
+  useReducedMotion(tester);
+}
+
+void useReducedMotion(WidgetTester tester) {
+  tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
 
 Widget appUnderTest() => ProviderScope(overrides: testOverrides(), child: const PawonApp());
@@ -56,4 +64,16 @@ Future<void> loadAppFonts() async {
     final loader = FontLoader(family)..addFont(rootBundle.load(asset));
     await loader.load();
   }
+}
+
+/// Opens the app and signs in with the demo account (Beranda is showing afterwards).
+Future<void> signIn(WidgetTester tester) async {
+  await tester.pumpWidget(appUnderTest());
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Sudah punya akun? Masuk'));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField).at(0), 'rafi@email.com');
+  await tester.enterText(find.byType(TextField).at(1), 'rahasia123');
+  await tester.tap(find.widgetWithText(InkWell, 'Masuk'));
+  await tester.pumpAndSettle();
 }

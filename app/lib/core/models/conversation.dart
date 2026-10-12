@@ -27,18 +27,70 @@ class Offer {
       Offer(id: id, listingId: listingId, receiverId: receiverId, amount: amount ?? this.amount, portions: portions, status: status ?? this.status);
 }
 
+/// The reservation behind an accepted offer or an "Ambil". There is no code to read out: the provider shows a QR
+/// ([qrPayload]) and the receiver scans it before [deadline].
 class Pickup {
-  const Pickup({required this.id, required this.code, this.status = PickupStatus.waiting, this.pickedUpAt});
+  const Pickup({
+    required this.id,
+    required this.deadline,
+    this.status = PickupStatus.reserved,
+    this.pickedUpAt,
+    this.payMethod,
+    this.paidAt,
+    this.statusChecks = 0,
+    this.voucherCode,
+    this.discount = 0,
+  });
 
   final String id;
-
-  /// `PWN-XXXX`, generated on the (mock) server and shown only to receiver and provider.
-  final String code;
+  final DateTime deadline;
   final PickupStatus status;
   final DateTime? pickedUpAt;
 
-  Pickup copyWith({PickupStatus? status, DateTime? pickedUpAt}) =>
-      Pickup(id: id, code: code, status: status ?? this.status, pickedUpAt: pickedUpAt ?? this.pickedUpAt);
+  /// Null until the receiver picks how to pay (always null for free food).
+  final PayMethod? payMethod;
+
+  /// Set when an in-app QRIS payment went through.
+  final DateTime? paidAt;
+
+  /// How many times "Cek status pembayaran" was tapped (the mock gateway answers on the second check).
+  final int statusChecks;
+
+  /// Food voucher (`PWN-V-XXXX`) applied on Pembayaran and the rupiah it takes off. The voucher counts as used only once the
+  /// payment is confirmed.
+  final String? voucherCode;
+  final int discount;
+
+  bool get paid => paidAt != null;
+  bool get open => status == PickupStatus.reserved;
+
+  /// What the provider's QR encodes. One reservation, one scan.
+  String get qrPayload => 'pawonfood://ambil/$id';
+
+  Pickup copyWith({PickupStatus? status, DateTime? pickedUpAt, PayMethod? payMethod, DateTime? paidAt, int? statusChecks, int? discount}) => Pickup(
+        id: id,
+        deadline: deadline,
+        status: status ?? this.status,
+        pickedUpAt: pickedUpAt ?? this.pickedUpAt,
+        payMethod: payMethod ?? this.payMethod,
+        paidAt: paidAt ?? this.paidAt,
+        statusChecks: statusChecks ?? this.statusChecks,
+        voucherCode: voucherCode,
+        discount: discount ?? this.discount,
+      );
+
+  /// Same reservation with a voucher applied, or with it removed ([code] null).
+  Pickup withVoucher(String? code, int discount) => Pickup(
+        id: id,
+        deadline: deadline,
+        status: status,
+        pickedUpAt: pickedUpAt,
+        payMethod: payMethod,
+        paidAt: paidAt,
+        statusChecks: statusChecks,
+        voucherCode: code,
+        discount: discount,
+      );
 }
 
 class Review {
@@ -56,6 +108,7 @@ enum ThreadStatus {
   accepted('Tawaran diterima'),
   ready('Siap diambil'),
   done('Selesai'),
+  expired('Kedaluwarsa'),
   soldOut('Habis');
 
   const ThreadStatus(this.label);
@@ -101,6 +154,7 @@ class Conversation {
 
   ThreadStatus get status {
     if (pickup?.status == PickupStatus.pickedUp) return ThreadStatus.done;
+    if (pickup?.status == PickupStatus.expired) return ThreadStatus.expired;
     if (closedSoldOut && pickup == null) return ThreadStatus.soldOut;
     if (offer?.status == OfferStatus.accepted && (offer!.amount > 0)) return ThreadStatus.accepted;
     if (pickup != null) return ThreadStatus.ready;

@@ -10,7 +10,13 @@ class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PopScope(
+        // System Back on Peta, Pesan or Profil goes to Beranda first; only Beranda lets the app close.
+        canPop: navigationShell.currentIndex == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) navigationShell.goBranch(0);
+        },
+        child: Scaffold(
         body: Stack(
           children: [
             Positioned.fill(child: navigationShell),
@@ -25,6 +31,7 @@ class AppShell extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       );
 }

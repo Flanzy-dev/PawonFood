@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-PawonFood is a hyperlocal surplus-food sharing app ("Dari dapur ke dapur") built for a UGM sustainability hackathon, starting in Pogung, Sleman. The Flutter mobile app MVP lives in `/app` (all 18 screens, mock data). `/web` and `/ml` do not exist yet.
+PawonFood is a hyperlocal surplus-food sharing app ("Dari dapur ke dapur") built for a UGM sustainability hackathon, starting in Pogung, Sleman. The Flutter mobile app lives in `/app` (all 75 Figma hi-fi screens, mock data, simulated QR/payment/ads). `/web` and `/ml` do not exist yet.
 
 @AGENTS.md
 
@@ -11,6 +11,8 @@ PawonFood is a hyperlocal surplus-food sharing app ("Dari dapur ke dapur") built
   - Use `Evaluasi Ide Aplikasi PawonFood.md` (cleaned). Ignore the `(raw)` file, which has corrupted text.
   - `PawonFood UI apps.pdf` (mobile) and `PawonFood UI.pdf` (landing page) are the visual source of truth.
 - `/app` (Flutter/Dart) exists: see [app/README.md](app/README.md) for how to run it, the demo account, and the assumptions made for the PRD open questions. Flutter is at `~/flutter/bin` and is not on PATH, so run `export PATH="$HOME/flutter/bin:$PATH"` first. `flutter create` fails inside this OneDrive folder; scaffold elsewhere and copy.
+- Motion lives in `app/lib/core/motion/` (rules in DESIGN_SYSTEM.md → Motion). Use those widgets and tokens instead of ad-hoc durations, and keep every animation off under `Motion.reduced`.
+- Don't run `dart format` on existing files: this SDK's formatter uses the tall style and rewrites code written in the older 160-column style.
 - The AI photo check in the app is **simulated** (`FoodValidator` interface). The real YOLO/TFLite model comes from `/ml`.
 - Not yet created: `/web` (Next.js/TypeScript), `/ml` (Python, YOLOv8 → TFLite).
 - `.fallow/` is a generated cache from the fallow analyzer. Don't edit it.

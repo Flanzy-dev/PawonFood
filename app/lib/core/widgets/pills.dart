@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/conversation.dart';
 import '../models/enums.dart';
+import '../motion/motion_widgets.dart';
 import '../services/food_label.dart';
 import '../services/formatters.dart';
 import '../theme/app_colors.dart';
@@ -94,7 +95,7 @@ class InfoTag extends StatelessWidget {
       );
 }
 
-/// Tier tag (Sobat Pawon / Food Savior / Pahlawan Pangan).
+/// Tier tag (Pawon Friend / Pawon Elite / Pawon Hero).
 class TierTag extends InfoTag {
   TierTag(Tier tier, {super.key, super.height, super.size}) : super(tier.label);
 }
@@ -113,17 +114,17 @@ class PointsPill extends StatelessWidget {
 
   final int points;
 
+  /// Counts to the new balance when points change (claiming a reward, a pickup).
   @override
-  Widget build(BuildContext context) => Pill(
-        '$points Poin',
-        fill: AppColors.surfaceSand,
-        color: AppColors.accentInk,
-        icon: LucideIcons.coins,
-        iconColor: AppColors.accent,
+  Widget build(BuildContext context) => Container(
         height: 40,
-        size: 15,
-        weight: 700,
-        hPad: 16,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(color: AppColors.surfaceSand, borderRadius: BorderRadius.circular(999)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(LucideIcons.coins, size: 18, color: AppColors.accent),
+          const SizedBox(width: 6),
+          AnimatedCount(value: points, format: (v) => '${v.round()} Poin', style: AppTypography.text(15, weight: 700, color: AppColors.accentInk)),
+        ]),
       );
 }
 

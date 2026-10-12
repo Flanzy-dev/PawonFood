@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../models/listing.dart';
+import '../motion/pressable.dart';
 import '../services/food_label.dart';
 import '../services/formatters.dart';
 import '../theme/app_colors.dart';
@@ -51,55 +54,62 @@ class FoodCard extends ConsumerWidget {
     return Semantics(
       button: true,
       label: '${l.name}, ${l.provider.name}, ${l.isFree ? 'gratis' : formatRupiah(l.price)}${l.negotiable ? ', bisa ditawar' : ''}, sisa ${l.portionsLeft} porsi, ${formatDistance(distance)}',
-      child: Material(
-        color: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppColors.border)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: SizedBox(
-            height: 134,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 104,
-                    height: 110,
-                    child: Stack(
-                      children: [
-                        Positioned(top: 0, left: 0, child: ListingPhoto(l, width: 104, height: 104, radius: 12)),
-                        if (label != null) Positioned(top: 6, right: 6, child: FoodLabelBadge(label)),
-                        Positioned(bottom: 12, left: 6, child: StockBadge(l.portionsLeft)),
-                      ],
+      child: Pressable(
+        scale: 0.98,
+        child: Material(
+          color: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppColors.border)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              // 134 at normal text size (the Figma card). The text blocks are stacked in a Stack, so at larger system text
+              // sizes the card grows with them instead of overlapping: title + provider (42 dp per scale), tag and pill rows, paddings.
+              height: math.max(134, 42 * textScaleOf(context) + 92),
+              child: Padding(
+                // The photo has equal 15 px margins left, top and bottom, and the text column shares its top and bottom lines.
+                // The right edge stays at 12 px, where the price block ends (matches the Figma cards).
+                padding: const EdgeInsets.fromLTRB(15, 15, 12, 15),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 104,
+                      height: 104,
+                      child: Stack(
+                        children: [
+                          Positioned(top: 0, left: 0, child: ListingPhoto(l, width: 104, height: 104, radius: 12)),
+                          if (label != null) Positioned(top: 6, right: 6, child: FoodLabelBadge(label)),
+                          Positioned(bottom: 6, left: 6, child: StockBadge(l.portionsLeft)),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(l.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.display(16, weight: 700, height: 22)),
-                              const SizedBox(height: 2),
-                              Text(l.provider.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.text(14, height: 20, color: AppColors.inkMuted)),
-                              const SizedBox(height: 4),
-                              Align(alignment: Alignment.centerLeft, child: TierTag(l.provider.tier)),
-                            ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(l.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.display(16, weight: 700, height: 22)),
+                                const SizedBox(height: 2),
+                                Text(l.provider.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.text(14, height: 20, color: AppColors.inkMuted)),
+                                const SizedBox(height: 4),
+                                Align(alignment: Alignment.centerLeft, child: TierTag(l.provider.tier)),
+                              ],
+                            ),
                           ),
-                        ),
-                        Positioned(left: 0, bottom: 0, child: DistancePill(distance)),
-                        Positioned(right: 0, bottom: 0, child: CardPrice(l)),
-                      ],
+                          Positioned(left: 0, bottom: 0, child: DistancePill(distance)),
+                          Positioned(right: 0, bottom: 0, child: CardPrice(l)),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

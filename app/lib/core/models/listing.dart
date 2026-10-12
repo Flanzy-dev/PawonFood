@@ -23,6 +23,8 @@ class Listing {
     this.cookedAt,
     this.isOwn = false,
     this.localPhotoPath,
+    this.description,
+    this.bestBefore,
   });
 
   final String id;
@@ -47,6 +49,12 @@ class Listing {
   final ListingStatus status;
   final DateTime? cookedAt;
   final bool isOwn;
+
+  /// Short note from the provider (B8 "Deskripsi").
+  final String? description;
+
+  /// "Baik digunakan sebelum" for sealed food (C15c).
+  final DateTime? bestBefore;
 
   bool get isFree => price == 0;
   bool get isSoldOut => status == ListingStatus.habis || portionsLeft <= 0;
@@ -74,6 +82,8 @@ class Listing {
         status: status ?? this.status,
         cookedAt: cookedAt,
         isOwn: isOwn,
+        description: description,
+        bestBefore: bestBefore,
       );
 
   /// Builds a listing from mock JSON. Times are relative to [now] so the data never goes stale.
@@ -94,5 +104,7 @@ class Listing {
         status: (j['soldOut'] ?? false) as bool ? ListingStatus.habis : ListingStatus.available,
         cookedAt: j['cookedMinutesAgo'] == null ? null : now.subtract(Duration(minutes: (j['cookedMinutesAgo'] as num).toInt())),
         isOwn: provider.id == ownerId,
+        description: j['description'] as String?,
+        bestBefore: j['bestBeforeInDays'] == null ? null : now.add(Duration(days: (j['bestBeforeInDays'] as num).toInt())),
       );
 }

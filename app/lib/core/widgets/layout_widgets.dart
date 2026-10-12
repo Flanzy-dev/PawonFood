@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'app_button.dart';
+import 'top_bar.dart';
 
 /// Section heading with an optional trailing action ("Segera habis di sekitarmu" ... "Semua").
 class SectionTitle extends StatelessWidget {
@@ -27,25 +31,49 @@ class SectionTitle extends StatelessWidget {
       );
 }
 
-/// Search field: white, rounded, search icon.
-class SearchField extends StatelessWidget {
-  const SearchField({super.key, required this.hint, required this.onChanged, this.controller});
+/// Search field: white, rounded, search icon. Pass [value] to let the screen clear or set the text from outside (a
+/// "Hapus filter" button); typing keeps working through [onChanged].
+class SearchField extends StatefulWidget {
+  const SearchField({super.key, required this.hint, required this.onChanged, this.controller, this.value});
 
   final String hint;
   final ValueChanged<String> onChanged;
   final TextEditingController? controller;
+  final String? value;
+
+  @override
+  State<SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<SearchField> {
+  late final TextEditingController _own = TextEditingController(text: widget.value);
+  TextEditingController get _c => widget.controller ?? _own;
+
+  @override
+  void didUpdateWidget(SearchField old) {
+    super.didUpdateWidget(old);
+    final v = widget.value;
+    if (v != null && v != _c.text) _c.text = v;
+  }
+
+  @override
+  void dispose() {
+    _own.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 52,
+        // 52 at normal text size; taller when the system font is larger, so the typed text isn't clipped.
+        height: math.max(52, 28 + 24 * textScaleOf(context)),
         child: TextField(
-          controller: controller,
-          onChanged: onChanged,
+          controller: _c,
+          onChanged: widget.onChanged,
           textInputAction: TextInputAction.search,
           style: AppTypography.text(16),
           cursorColor: AppColors.primary,
           decoration: InputDecoration(
-            hintText: hint,
+            hintText: widget.hint,
             hintStyle: AppTypography.text(16, color: AppColors.inkMuted),
             prefixIcon: const Icon(LucideIcons.search, size: 22, color: AppColors.inkMuted),
             filled: true,
@@ -119,14 +147,17 @@ void showAppSnack(BuildContext context, String message) {
 }
 
 /// Primary action pinned above the bottom edge with a top border and soft shadow (sticky bottom bar).
+/// [compact] drops the padding to 8 above and 8 below (plus the system gesture inset), so the action sits close to the
+/// gesture area but not against the screen edge.
 class StickyBottomBar extends StatelessWidget {
-  const StickyBottomBar({super.key, required this.child});
+  const StickyBottomBar({super.key, required this.child, this.compact = false});
 
   final Widget child;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(16, compact ? 8 : 16, 16, (compact ? 8 : 16) + MediaQuery.paddingOf(context).bottom),
         decoration: const BoxDecoration(
           color: AppColors.surface,
           border: Border(top: BorderSide(color: AppColors.border)),
@@ -153,5 +184,38 @@ class ActionPair extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: AppButton(label: primaryLabel, onPressed: onPrimary)),
         ],
+      );
+}
+
+/// Shown when a screen's data is gone (a deleted chat, a reservation that no longer exists): a way back instead of a bare
+/// message on a blank page.
+class NotFoundScaffold extends StatelessWidget {
+  const NotFoundScaffold({super.key, this.title = 'Reservasi tidak ditemukan', this.fallback = '/messages', this.actionLabel = 'Ke Pesan'});
+
+  final String title;
+  final String fallback;
+  final String actionLabel;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              TopBar(fallback: fallback),
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    child: EmptyState(
+                      icon: LucideIcons.searchX,
+                      title: title,
+                      body: 'Mungkin sudah dihapus atau tidak tersedia lagi.',
+                      actions: [AppButton(label: actionLabel, onPressed: () => context.go(fallback))],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
 }

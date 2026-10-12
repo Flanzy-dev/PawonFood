@@ -6,9 +6,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/data/chat_repository.dart';
 import '../../core/data/listings_repository.dart';
 import '../../core/data/providers.dart';
+import '../../core/motion/motion.dart';
 import '../../core/models/conversation.dart';
 import '../../core/services/formatters.dart';
-import '../../core/services/points.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
@@ -16,8 +16,10 @@ import '../../core/widgets/app_chip.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/listing_photo.dart';
 import '../../core/widgets/navigation_widgets.dart';
+import '../ads/ad_screen.dart';
 
-/// B11 Ulasan: shown after "Sudah saya ambil". A good rating earns the provider bonus points.
+/// B11 Ulasan: opens right after the QR scan, while the receiver is still at the pickup point. A good rating earns
+/// the provider bonus points. After "Kirim ulasan" the post-review ad shows (at most once a day).
 class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({super.key, required this.conversationId});
 
@@ -32,6 +34,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   final _comment = TextEditingController();
   final _selected = <String>{};
   var _rating = 0;
+  static const _ratingWords = ['Kurang', 'Biasa', 'Cukup', 'Bagus', 'Mantap'];
 
   @override
   void dispose() {
@@ -39,20 +42,27 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     super.dispose();
   }
 
+  var _sent = false;
+
   void _submit(Conversation conv) {
+    if (_sent) return; // a second tap while the next screen opens must not send the review twice
+    _sent = true;
     ref.read(chatProvider.notifier).submitReview(conv.id, Review(pickupId: conv.pickup?.id ?? conv.id, rating: _rating, tags: _selected.toList(), comment: _comment.text.trim()));
-    showAppSnack(context, 'Terima kasih! Ulasanmu terkirim.');
-    context.go('/');
+    if (takeAdSlot(ref)) {
+      context.go('/ad');
+    } else {
+      showAppSnack(context, 'Terima kasih! Ulasanmu terkirim.');
+      context.go('/');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final conv = ref.watch(conversationProvider(widget.conversationId));
     final listing = conv == null ? null : ref.watch(listingByIdProvider(conv.listingId));
-    if (conv == null || listing == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text('Pesanan tidak ditemukan')));
+    if (conv == null || listing == null) return const NotFoundScaffold(title: 'Pesanan tidak ditemukan');
     final now = ref.watch(clockProvider)();
     final amount = conv.offer?.amount ?? listing.price;
-    final points = pickupPoints(portions: conv.offer?.portions ?? 1, isFree: amount == 0, rating: _rating == 0 ? null : _rating);
 
     return Scaffold(
       body: SafeArea(
@@ -80,7 +90,11 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(listing.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.display(16, weight: 700, height: 21)),
                           Text('${listing.provider.name} · ${amount == 0 ? 'Gratis' : formatRupiah(amount)}', style: AppTypography.text(14, color: AppColors.inkMuted)),
-                          Text('Diambil hari ini · ${formatTime(conv.pickup?.pickedUpAt ?? now)}', style: AppTypography.text(13, color: AppColors.inkMuted)),
+                          Row(children: [
+                            const Icon(LucideIcons.check, size: 15, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Expanded(child: Text('Pengambilan berhasil · ${formatTime(conv.pickup?.pickedUpAt ?? now)}', maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTypography.text(13, weight: 600, color: AppColors.primary))),
+                          ]),
                         ]),
                       ),
                     ]),
@@ -99,11 +113,34 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                           radius: 30,
                           child: Padding(
                             padding: const EdgeInsets.only(right: 8),
-                            child: Icon(Icons.star_rounded, size: 50, color: i <= _rating ? AppColors.accent : AppColors.border),
+                            // Stars up to the tapped one fill in turn and pop, so the rating reads as a gesture.
+                            child: AnimatedScale(
+                              scale: i <= _rating ? 1 : 0.92,
+                              duration: Motion.of(context, Motion.base + Motion.stagger * (i - 1)),
+                              curve: Motion.pop,
+                              child: TweenAnimationBuilder<Color?>(
+                                tween: ColorTween(end: i <= _rating ? AppColors.accent : AppColors.inkMuted),
+                                duration: Motion.of(context, Motion.fast + Motion.stagger * (i - 1)),
+                                // Filled vs outline, so the rating never depends on colour alone.
+                                builder: (_, c, _) => Icon(i <= _rating ? Icons.star_rounded : Icons.star_outline_rounded, size: 50, color: c),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                   ]),
+                  // The rating in words, next to the stars.
+                  AnimatedSize(
+                    // 1 ms instead of zero under reduced motion: a zero-length AnimatedSize re-dirties itself inside layout.
+                    duration: Motion.reduced(context) ? const Duration(milliseconds: 1) : Motion.fast,
+                    alignment: Alignment.topLeft,
+                    child: _rating == 0
+                        ? const SizedBox(width: double.infinity)
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text('${_ratingWords[_rating - 1]} · $_rating/5', style: AppTypography.text(15, weight: 600, color: AppColors.inkMuted)),
+                          ),
+                  ),
                   const SizedBox(height: 20),
                   Text('Apa yang bagus?', style: AppTypography.display(16, weight: 700)),
                   const SizedBox(height: 10),
@@ -126,12 +163,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                       filled: true,
                       fillColor: AppColors.surface,
                       contentPadding: const EdgeInsets.all(16),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.borderStrong)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text('Penyedia mendapat $points poin setelah kamu menilai. Ulasan buruk berulang bisa membuat penyedia diblokir.', style: AppTypography.text(13, height: 19, color: AppColors.inkMuted)),
+                  Text('Kamu mendapat poin setelah menilai. Ulasan buruk berulang bisa membuat penyedia di-suspend, lalu diblokir jika berlanjut.', style: AppTypography.text(13, height: 19, color: AppColors.inkMuted)),
                 ],
               ),
             ),

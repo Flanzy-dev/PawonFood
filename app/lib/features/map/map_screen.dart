@@ -4,45 +4,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/listings_repository.dart';
 import '../../core/data/providers.dart';
+import '../../core/models/enums.dart';
 import '../../core/models/listing.dart';
+import '../../core/motion/motion.dart';
 import '../../core/services/geo.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_chip.dart';
 import '../../core/widgets/mini_food_card.dart';
 import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/pawon_map.dart';
 
-enum MapFilter {
-  all('Semua'),
-  free('Gratis'),
-  warm('Sedang hangat');
-
-  const MapFilter(this.label);
-  final String label;
-}
-
-final mapFilterProvider = StateProvider<MapFilter>((ref) => MapFilter.all);
-
 /// Listing id selected on the map (pin tap); the selected listing is listed first in the sheet.
 final mapSelectedProvider = StateProvider<String?>((ref) => null);
 
-/// Listings shown on the full map: everything within 2 km of the chosen location, filtered by the map chips.
+/// Listings shown on the full map: everything within 2 km of the chosen location, filtered by the category chips
+/// (shared with Beranda, so both tabs show the same category).
 final mapListingsProvider = Provider<List<FeedItem>>((ref) {
   final now = ref.watch(clockProvider)();
   final here = ref.watch(locationProvider).position;
-  final filter = ref.watch(mapFilterProvider);
+  final category = ref.watch(categoryFilterProvider);
   final items = <FeedItem>[];
   for (final l in ref.watch(listingsProvider)) {
     if (!isVisibleListing(l, now)) continue;
     final d = distanceMeters(here, l.position);
     if (d > 2000) continue;
-    if (filter == MapFilter.free && !l.isFree) continue;
-    if (filter == MapFilter.warm && !l.isWarm(now)) continue;
+    if (category != null && l.category != category) continue;
     items.add(FeedItem(l, d));
   }
   items.sort((a, b) => a.distance.compareTo(b.distance));
@@ -62,7 +55,7 @@ class MapScreen extends ConsumerStatefulWidget {
   ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends ConsumerState<MapScreen> {
+class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateMixin {
   final _controller = MapController();
   final _sheet = DraggableScrollableController();
   final _extentPx = ValueNotifier<double>(_collapsedPx);
@@ -82,12 +75,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final id = ref.read(mapSelectedProvider);
       final l = id == null ? null : ref.read(listingByIdProvider(id));
-      if (l != null && mounted) _controller.move(l.position, 16);
+      if (l != null && mounted) _glide(l.position, 16);
     });
+  }
+
+  AnimationController? _camera;
+
+  /// Moves the map camera smoothly (flutter_map's move() jumps).
+  void _glide(LatLng to, double zoom) {
+    final cam = _controller.camera;
+    if (Motion.reduced(context)) {
+      _controller.move(to, zoom);
+      return;
+    }
+    _camera?.dispose();
+    final c = AnimationController(vsync: this, duration: Motion.slow * 2);
+    _camera = c;
+    final lat = Tween(begin: cam.center.latitude, end: to.latitude), lng = Tween(begin: cam.center.longitude, end: to.longitude);
+    final z = Tween(begin: cam.zoom, end: zoom);
+    final t = CurvedAnimation(parent: c, curve: Motion.move);
+    c.addListener(() => _controller.move(LatLng(lat.transform(t.value), lng.transform(t.value)), z.transform(t.value)));
+    c.forward();
   }
 
   @override
   void dispose() {
+    _camera?.dispose();
     _settle?.cancel();
     _sheet.dispose();
     _extentPx.dispose();
@@ -112,14 +125,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _select(Listing l) {
     ref.read(mapSelectedProvider.notifier).state = l.id;
     if (_list?.hasClients ?? false) _list!.jumpTo(0);
-    if (_sheet.isAttached) _sheet.animateTo(_minFraction, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+    if (!_sheet.isAttached) return;
+    if (Motion.reduced(context)) {
+      _sheet.jumpTo(_minFraction);
+    } else {
+      _sheet.animateTo(_minFraction, duration: Motion.base, curve: Motion.enter);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = ref.watch(locationProvider);
     final items = ref.watch(mapListingsProvider);
-    final filter = ref.watch(mapFilterProvider);
+    final category = ref.watch(categoryFilterProvider);
     final selectedId = ref.watch(mapSelectedProvider);
     FeedItem? selected;
     for (final i in items) {
@@ -134,8 +152,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return Stack(
       children: [
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOut,
+          duration: Motion.of(context, Motion.base),
+          curve: Motion.move,
           left: 0,
           right: 0,
           top: 0,
@@ -176,7 +194,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                       boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 16, offset: Offset(0, -4))],
                     ),
-                    child: ListView(
+                    // Clip to the panel's rounded top, so scrolled cards never poke out over the map at the corners.
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                      child: ListView(
                       controller: scroll,
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       children: [
@@ -185,7 +206,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ValueListenableBuilder<double>(
                           valueListenable: _extentPx,
                           builder: (context, px, _) => AnimatedSize(
-                            duration: const Duration(milliseconds: 160),
+                            // 1 ms instead of zero when motion is reduced: a zero-length AnimatedSize re-dirties itself
+                            // inside this sliver's layout.
+                            duration: Motion.reduced(context) ? const Duration(milliseconds: 1) : Motion.fast,
+                            curve: Motion.move,
                             alignment: Alignment.topLeft,
                             child: px > _collapsedPx + 24 && ordered.isNotEmpty
                                 ? Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('${ordered.length} makanan dalam ${far ? 2 : 1} km', style: AppTypography.display(17, weight: 700, height: 22)))
@@ -193,13 +217,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           ),
                         ),
                         if (ordered.isEmpty)
-                          Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text('Belum ada makanan di area ini.', textAlign: TextAlign.center, style: AppTypography.bodyMuted))
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Column(children: [
+                              Text('Belum ada makanan di area ini.', textAlign: TextAlign.center, style: AppTypography.bodyMuted),
+                              if (category != null) ...[
+                                const SizedBox(height: 12),
+                                AppButton(label: 'Hapus filter', variant: AppButtonVariant.outline, onPressed: () => ref.read(categoryFilterProvider.notifier).state = null),
+                              ],
+                              if (ref.watch(radiusMetersProvider) < 2000) ...[
+                                const SizedBox(height: 12),
+                                AppButton(label: 'Perluas radius ke 2 km', onPressed: () => expandRadius(ref)),
+                              ],
+                            ]),
+                          )
                         else
                           for (final (i, item) in ordered.indexed) ...[
                             if (i > 0) const SizedBox(height: 12),
                             MiniFoodCard(listing: item.listing, distance: item.distance, onTap: () => context.push('/listing/${item.listing.id}')),
                           ],
                       ],
+                    ),
                     ),
                   );
                 },
@@ -223,7 +261,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Radius 1 km dari', style: AppTypography.text(13, color: AppColors.inkMuted)),
+                            Text('Radius ${far ? 2 : 1} km dari', style: AppTypography.text(13, color: AppColors.inkMuted)),
                             Text(area, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.display(20, height: 26)),
                           ],
                         ),
@@ -235,7 +273,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           color: AppColors.surfaceSand,
                           borderRadius: BorderRadius.circular(14),
                           clipBehavior: Clip.antiAlias,
-                          child: InkWell(onTap: () => _controller.move(loc.position, 14.2), child: const SizedBox(width: 44, height: 44, child: Icon(LucideIcons.locateFixed, size: 24, color: AppColors.primary))),
+                          child: InkWell(onTap: () => _glide(loc.position, 14.2), child: const SizedBox(width: 48, height: 48, child: Icon(LucideIcons.locateFixed, size: 24, color: AppColors.primary))),
                         ),
                       ),
                     ],
@@ -245,8 +283,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(children: [
-                    for (final f in MapFilter.values) ...[
-                      AppChip(label: f.label, selected: f == filter, onTap: () => ref.read(mapFilterProvider.notifier).state = f),
+                    // Same category chips as Beranda (intentionally English), one shared selection.
+                    for (final c in <FoodCategory?>[null, ...FoodCategory.values]) ...[
+                      AppChip(label: c?.chip ?? 'All', selected: category == c, onTap: () => ref.read(categoryFilterProvider.notifier).state = c),
                       const SizedBox(width: 8),
                     ],
                   ]),

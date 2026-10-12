@@ -5,15 +5,20 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/listings_repository.dart';
 import '../../core/data/session_repository.dart';
+import '../../core/models/enums.dart';
+import '../../core/motion/entrance.dart';
+import '../../core/motion/pressable.dart';
 import '../../core/services/geo.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_chip.dart';
+import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/brand.dart';
 import '../../core/widgets/food_card.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
+import '../../core/widgets/option_row.dart';
 import '../../core/widgets/pawon_map.dart';
 import '../../core/widgets/pills.dart';
 
@@ -27,11 +32,15 @@ class HomeScreen extends ConsumerWidget {
     final loc = ref.watch(locationProvider);
     final feed = ref.watch(feedProvider);
     final filters = ref.watch(feedFiltersProvider);
+    final category = ref.watch(categoryFilterProvider);
+    final query = ref.watch(searchQueryProvider);
+    final narrowed = query.trim().isNotEmpty || category != null;
     final radius = ref.watch(radiusMetersProvider);
     final km = (radius / 1000).round();
     final area = loc.name.split(',').first;
 
-    return SafeArea(
+    return EntranceScope(
+      child: SafeArea(
       bottom: false,
       child: ListView(
         padding: EdgeInsets.fromLTRB(16, 12, 16, navContentInset(context)),
@@ -73,21 +82,17 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Text('Lapar? Masih ada yang hangat di dekatmu.', style: AppTypography.titleXl),
           const SizedBox(height: 16),
-          SearchField(hint: 'Cari lauk, nasi, roti...', onChanged: (v) => ref.read(searchQueryProvider.notifier).state = v),
+          SearchField(hint: 'Cari lauk, nasi, roti...', value: query, onChanged: (v) => ref.read(searchQueryProvider.notifier).state = v),
           const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                for (final f in FeedFilter.values) ...[
+                for (final c in <FoodCategory?>[null, ...FoodCategory.values]) ...[
                   AppChip(
-                    label: f.label,
-                    selected: filters.contains(f),
-                    onTap: () {
-                      final next = {...filters};
-                      next.contains(f) ? next.remove(f) : next.add(f);
-                      ref.read(feedFiltersProvider.notifier).state = next;
-                    },
+                    label: c?.chip ?? 'All',
+                    selected: category == c,
+                    onTap: () => ref.read(categoryFilterProvider.notifier).state = c,
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -106,7 +111,9 @@ class HomeScreen extends ConsumerWidget {
                       mini: true,
                       center: loc.position,
                       radiusMeters: radius,
-                      listings: [for (final i in feed.take(3)) i.listing],
+                      // Nearest first; the map keeps the first price pins that fit clear of the overlays below.
+                      listings: [for (final i in feed) i.listing],
+                      keepClear: (s) => [const Rect.fromLTWH(0, 0, 240, 48), Rect.fromLTWH(s.width - 72, s.height - 72, 72, 72)],
                     ),
                   ),
                   Positioned(
@@ -129,12 +136,16 @@ class HomeScreen extends ConsumerWidget {
                       child: Semantics(
                         button: true,
                         label: 'Lihat peta penuh',
-                        child: Material(
-                          color: AppColors.primary,
-                          shape: const CircleBorder(),
-                          elevation: 2,
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(onTap: () => context.go('/map'), child: const SizedBox(width: 48, height: 48, child: Center(child: FullscreenIcon(size: 22)))),
+                        excludeSemantics: true,
+                        child: Pressable(
+                          scale: 0.92,
+                          child: Material(
+                            color: AppColors.primary,
+                            shape: const CircleBorder(),
+                            elevation: 2,
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(onTap: () => context.go('/map'), child: const SizedBox(width: 48, height: 48, child: Center(child: FullscreenIcon(size: 22)))),
+                          ),
                         ),
                       ),
                     ),
@@ -143,7 +154,26 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          if (feed.isEmpty)
+          if (feed.isEmpty && narrowed)
+            // A search or category with no match is not the same as "nothing within the radius".
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: EmptyState(
+                icon: LucideIcons.searchX,
+                title: query.trim().isNotEmpty ? 'Tidak ada hasil untuk "${query.trim()}"' : 'Belum ada ${category!.label.toLowerCase()} di sekitarmu',
+                body: 'Coba kata kunci atau kategori lain.',
+                actions: [
+                  AppButton(
+                    label: 'Hapus filter',
+                    onPressed: () {
+                      ref.read(searchQueryProvider.notifier).state = '';
+                      ref.read(categoryFilterProvider.notifier).state = null;
+                    },
+                  ),
+                ],
+              ),
+            )
+          else if (feed.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: EmptyState(
@@ -159,48 +189,46 @@ class HomeScreen extends ConsumerWidget {
           else ...[
             SectionTitle('Segera habis di sekitarmu', actionLabel: 'Semua', onAction: () => context.push('/semua')),
             const SizedBox(height: 8),
-            for (final item in feed) ...[
-              FoodCard(listing: item.listing, distance: item.distance, onTap: () => context.push('/listing/${item.listing.id}')),
-              const SizedBox(height: 12),
-            ],
+            for (final (i, item) in feed.indexed)
+              FadeSlideIn(
+                key: ValueKey(item.listing.id),
+                index: i,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FoodCard(listing: item.listing, distance: item.distance, onTap: () => context.push('/listing/${item.listing.id}')),
+                ),
+              ),
           ],
         ],
+      ),
       ),
     );
   }
 
   void _pickLocation(BuildContext context, WidgetRef ref) {
     final current = ref.read(locationProvider);
-    showModalBottomSheet<void>(
+    showAppSheet<void>(
       context: context,
-      useRootNavigator: true,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Ganti lokasi', style: AppTypography.titleL),
-              const SizedBox(height: 8),
-              for (final l in locations)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  minTileHeight: 56,
-                  leading: Icon(LucideIcons.mapPin, color: l.name == current.name ? AppColors.primary : AppColors.inkMuted),
-                  title: Text(l.name, style: AppTypography.text(16, weight: l.name == current.name ? 700 : 500)),
-                  trailing: l.name == current.name ? const Icon(LucideIcons.check, color: AppColors.primary) : null,
-                  onTap: () {
-                    ref.read(locationProvider.notifier).select(l);
-                    ref.read(radiusMetersProvider.notifier).state = walkableRadiusMeters;
-                    ref.read(feedFiltersProvider.notifier).state = {FeedFilter.walkable};
-                    Navigator.of(ctx).pop();
-                  },
-                ),
-            ],
-          ),
-        ),
+      builder: (ctx) => SheetBody(
+        title: 'Ganti lokasi',
+        children: [
+          for (final l in locations)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OptionRow(
+                title: l.name,
+                lead: OptionLead.icon,
+                showCheck: true,
+                selected: l.name == current.name,
+                onTap: () {
+                  ref.read(locationProvider.notifier).select(l);
+                  ref.read(radiusMetersProvider.notifier).state = walkableRadiusMeters;
+                  ref.read(feedFiltersProvider.notifier).state = {FeedFilter.walkable};
+                  Navigator.of(ctx).pop();
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

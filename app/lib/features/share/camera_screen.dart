@@ -7,11 +7,13 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/providers.dart';
+import '../../core/motion/motion_widgets.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/food_validator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/brand.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
@@ -29,9 +31,8 @@ class CameraScreen extends ConsumerStatefulWidget {
   ConsumerState<CameraScreen> createState() => _CameraScreenState();
 }
 
-class _CameraScreenState extends ConsumerState<CameraScreen> with SingleTickerProviderStateMixin {
+class _CameraScreenState extends ConsumerState<CameraScreen> {
   late final AppCamera _camera = ref.read(cameraFactoryProvider)();
-  late final AnimationController _scan = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat(reverse: true);
   Timer? _readyTimer;
   var _phase = _Phase.starting;
   ValidationResult? _rejection;
@@ -45,7 +46,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with SingleTickerPr
   @override
   void dispose() {
     _readyTimer?.cancel();
-    _scan.dispose();
     unawaited(_camera.dispose());
     super.dispose();
   }
@@ -107,7 +107,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with SingleTickerPr
   }
 
   void _chooseDemoMode() {
-    showModalBottomSheet<void>(
+    showAppSheet<void>(
       context: context,
       useRootNavigator: true,
       showDragHandle: true,
@@ -146,7 +146,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with SingleTickerPr
   }
 
   void _showTips() {
-    showModalBottomSheet<void>(
+    showAppSheet<void>(
       context: context,
       useRootNavigator: true,
       showDragHandle: true,
@@ -294,12 +294,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with SingleTickerPr
                         ),
                       ],
                       if (scanning)
-                        AnimatedBuilder(
-                          animation: _scan,
-                          builder: (_, _) => Positioned(
-                            left: 28,
-                            right: 28,
-                            top: c.maxHeight * (0.18 + 0.5 * _scan.value),
+                        // Positioned stays put; only a translate moves, so the sweep never re-lays-out the stack.
+                        Positioned(
+                          left: 28,
+                          right: 28,
+                          top: c.maxHeight * 0.18,
+                          child: LoopAnimation(
+                            duration: const Duration(milliseconds: 1500),
+                            builder: (_, t, child) => Transform.translate(offset: Offset(0, c.maxHeight * 0.5 * t), child: child),
                             child: Container(height: 4, decoration: BoxDecoration(color: AppColors.detectBox, borderRadius: BorderRadius.circular(2), boxShadow: const [BoxShadow(color: AppColors.detectBox, blurRadius: 12)])),
                           ),
                         ),
@@ -363,9 +365,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with SingleTickerPr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTypography.display(19, height: 24, color: titleColor)),
+                Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTypography.display(19, height: 24, color: titleColor)),
                 const SizedBox(height: 4),
-                Text(body, style: AppTypography.text(13, height: 19, color: AppColors.cameraText)),
+                Text(body, maxLines: 4, overflow: TextOverflow.ellipsis, style: AppTypography.text(13, height: 19, color: AppColors.cameraText)),
               ],
             ),
           ),

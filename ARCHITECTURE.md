@@ -18,7 +18,7 @@ External services:
 
 - Maps: Google Maps SDK or `flutter_map` (OSM). The MVP uses mock coordinates around Pogung.
 - AI: YOLOv8 Nano exported to TFLite, running **on-device** via `flutter_vision`. No server cost.
-- Payments (post-MVP): Midtrans / Xendit. The MVP is cash on pickup.
+- Payments (post-MVP): QRIS via Midtrans / Xendit, with no transaction fee. The MVP is cash on pickup.
 - Web hosting: Vercel (Next.js).
 
 ## AI Food Validator
@@ -90,7 +90,7 @@ It re-checks uploads when the backend exists.
 | Listing                | id, provider_id, photo_url, name, category, portions_left, original_price, price, is_free, negotiable, pickup_by, pickup_point, lat/lng, ai_status, ai_confidence, status, created_at |
 | Offer                  | id, listing_id, receiver_id, amount, portions, status (`pending` / `accepted` / `rejected`)                                                                                     |
 | Conversation / Message | conversation per (listing, receiver); messages with sender, body, type (`text` / `offer` / `system`), created_at                                                                |
-| Pickup                 | id, offer_id, code (`PWN-XXXX`), status (`waiting` / `picked_up` / `cancelled`), picked_up_at                                                                                 |
+| Pickup                 | id, offer_id, qr_token (one reservation, one scan), deadline (= listing `pickup_by`), status (`reserved` / `picked_up` / `expired` / `cancelled`), pay_method (`cash` / `qris`), paid_at, picked_up_at |
 | Review                 | pickup_id, rating, comment                                                                                                                                                            |
 | PointLedger            | user_id, delta, reason (pickup, free-food bonus, redemption)                                                                                                                          |
 | Reward                 | id, name (voucher minimarket, diskon ojek, sertifikat), cost                                                                                                                          |
@@ -110,10 +110,12 @@ Listing status: `available → reserved → picked_up`, or `expired` once past `
 
 1. Open a listing from the feed or map.
 2. Make an offer or start a chat. The provider accepts.
-3. The system message shows the pickup code `PWN-XXXX`.
-4. The receiver walks to the pickup point, shows the code and pays cash.
-5. The receiver taps "Sudah saya ambil". The pickup is marked `picked_up`, the receiver leaves a review, and the
-   provider earns points.
+3. The portions are reserved until the pickup deadline. A paid listing asks the receiver to pick how to pay
+   ("Pilih cara bayar": cash at pickup, or QRIS in the app, post-MVP). Free food skips this.
+4. The receiver walks to the pickup point ("Lihat rute"). The provider opens the reservation's QR ("Buka QR ambil").
+5. The receiver scans it ("Pindai QR") inside the pickup window. The pickup is marked `picked_up`, the receiver lands on
+   the review, and the provider earns points. A scan after the deadline expires the reservation and reopens the
+   portions. There is no code to read out.
 
 ## Data Flow
 

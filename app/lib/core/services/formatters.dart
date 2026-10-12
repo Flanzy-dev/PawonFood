@@ -62,3 +62,9 @@ String formatLongDate(DateTime d) {
   const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   return '${d.day} ${months[d.month - 1]} ${d.year}';
 }
+
+/// `18 Nov 2026` (three-letter month, for tight rows such as voucher subtitles).
+String formatShortDate(DateTime d) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  return '${d.day} ${months[d.month - 1]} ${d.year}';
+}

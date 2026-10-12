@@ -22,7 +22,8 @@
 - MVP first: build the core journey (upload → YOLO validate → map/feed → negotiate → pickup) with mock data.
   Do not build password reset, profile editing or in-app payments unless asked.
 - Food photos come from the camera only. Never add a gallery picker for listings.
-- Tier names: Sobat Pawon → Food Savior → Pahlawan Pangan. Never use "Borjuis".
+- Tier names: Pawon Friend → Pawon Elite → Pawon Hero (renamed 2026-10-08; formerly Sobat Pawon → Food Savior →
+  Pahlawan Pangan). Never use "Borjuis".
 - Ask before making major architectural changes
 
 ## Security

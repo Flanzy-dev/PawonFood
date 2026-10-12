@@ -81,7 +81,14 @@ class MockData {
                 portions: (o['portions'] as num?)?.toInt() ?? 1,
                 status: OfferStatus.values.firstWhere((s) => s.name == o['status']),
               ),
-        pickup: p == null ? null : Pickup(id: 'pk_$id', code: p['code'] as String, status: PickupStatus.values.firstWhere((s) => s.name == p['status'])),
+        pickup: p == null
+            ? null
+            : Pickup(
+                id: 'pk_$id',
+                deadline: listing.pickupBy,
+                status: PickupStatus.values.firstWhere((s) => s.name == p['status']),
+                payMethod: p['payMethod'] == null ? null : PayMethod.values.byName(p['payMethod'] as String),
+              ),
       );
     }
 

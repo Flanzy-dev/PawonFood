@@ -10,6 +10,7 @@ import '../../core/services/rewards.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/pills.dart';
@@ -74,7 +75,9 @@ class RewardDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
                   Text('Cara pakai', style: AppTypography.display(18, height: 24)),
                   const SizedBox(height: 8),
-                  for (final t in const ['1. Klaim voucher dan simpan kodenya.', '2. Tunjukkan kode ke mitra saat membayar.', '3. Potongan harga otomatis terhitung.'])
+                  for (final t in reward.isFoodVoucher
+                      ? const ['1. Klaim voucher dan simpan kodenya.', '2. Saat mengambil makanan berbayar, buka Pembayaran lalu pilih Pakai voucher.', '3. Potongan otomatis terhitung di total.']
+                      : const ['1. Klaim voucher dan simpan kodenya.', '2. Tunjukkan kode ke mitra saat membayar.', '3. Potongan harga otomatis terhitung.'])
                     Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(t, style: AppTypography.text(14, height: 20, color: AppColors.inkMuted))),
                   const SizedBox(height: 20),
                   Text('Syarat dan ketentuan', style: AppTypography.display(18, height: 24)),
@@ -98,7 +101,7 @@ class RewardDetailScreen extends ConsumerWidget {
 
   /// D21: confirmation sheet before the points are deducted.
   Future<void> _confirm(BuildContext context, WidgetRef ref, Reward reward, int points) async {
-    final confirmed = await showModalBottomSheet<bool>(
+    final confirmed = await showAppSheet<bool>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
@@ -184,9 +187,9 @@ class _ConfirmSheet extends StatelessWidget {
             row('Biaya voucher', '-${reward.cost} poin'),
             row('Sisa poin', '${points - reward.cost} poin', bold: true),
             const SizedBox(height: 12),
-            AppButton(label: 'Klaim sekarang', onPressed: () => Navigator.of(context).pop(true)),
+            AppButton(label: 'Klaim sekarang', onPressed: () => closeSheet(context, true)),
             const SizedBox(height: 12),
-            AppButton(label: 'Batal', variant: AppButtonVariant.outline, onPressed: () => Navigator.of(context).pop(false)),
+            AppButton(label: 'Batal', variant: AppButtonVariant.outline, onPressed: () => closeSheet(context, false)),
           ],
         ),
       ),

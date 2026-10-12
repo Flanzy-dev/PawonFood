@@ -7,17 +7,23 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/listings_repository.dart';
 import '../../core/data/providers.dart';
-import '../../core/data/session_repository.dart';
+import '../../core/data/pickup_points_repository.dart';
 import '../../core/models/enums.dart';
+import '../../core/motion/entrance.dart';
+import '../../core/motion/motion.dart';
 import '../../core/services/food_validator.dart';
+import '../../core/services/formatters.dart';
 import '../../core/services/pickup_times.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/form_controls.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
+import '../../core/widgets/option_row.dart';
 import '../../core/widgets/pills.dart';
+import 'pickup_point_sheet.dart';
 import 'share_state.dart';
 
 /// Step 2 of 3 (C15): "Semua sudah diisi. Cek sebentar, lalu bagikan." Everything is pre-filled by the AI result.
@@ -37,9 +43,12 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   var _negotiable = true;
   late final List<DateTime> _times;
   DateTime? _pickupBy;
+  late PickupPoint _point = ref.read(pickupPointsProvider.notifier).primary;
+  DateTime? _bestBefore;
   String? _nameError;
   String? _priceError;
   String? _formError;
+  var _published = false;
 
   @override
   void initState() {
@@ -59,8 +68,8 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   }
 
   void _publish() {
+    if (_published) return; // a second tap during the page transition must not publish twice
     final capture = ref.read(shareCaptureProvider);
-    final user = ref.read(sessionProvider);
     final price = _free ? 0 : parseAmount(_price.text);
     setState(() {
       _nameError = _name.text.trim().isEmpty ? 'Nama makanan wajib diisi' : null;
@@ -76,7 +85,9 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
             price: price!,
             negotiable: !_free && _negotiable,
             pickupBy: _pickupBy ?? _times[1],
-            pickupPoint: user?.pickupPoint ?? 'Kos Melati, Pogung',
+            pickupPoint: _point.fromMap ? '${_point.name}, ${_point.address}' : _point.name,
+            pickupPosition: _point.position,
+            bestBefore: _category == FoodCategory.sealedFood ? _bestBefore : null,
             photoPath: capture?.photoPath,
             aiConfidence: capture?.result.confidence ?? 0,
             aiStatus: capture?.result.verdict == AiVerdict.pendingReview ? AiStatus.pendingReview : AiStatus.approved,
@@ -86,37 +97,66 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
       setState(() => _formError = result.error);
       return;
     }
+    _published = true;
     context.pushReplacement('/share/done/${result.listing!.id}');
   }
 
+  Future<void> _changePoint() async {
+    final picked = await showPickupPointSheet(context, current: _point);
+    if (picked != null && mounted) setState(() => _point = picked);
+  }
+
+  /// C15c "Ubah kategori": three categories; sealed food also asks "Baik digunakan sebelum".
   void _changeCategory() {
-    showModalBottomSheet<void>(
+    showAppSheet<void>(
       context: context,
-      useRootNavigator: true,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          void pick(FoodCategory c) {
+            setState(() => _category = c);
+            setSheet(() {});
+            if (c != FoodCategory.sealedFood) Navigator.of(ctx).pop();
+          }
+
+          Future<void> pickDate() async {
+            final now = ref.read(clockProvider)();
+            final d = await showDatePicker(context: ctx, initialDate: _bestBefore ?? now.add(const Duration(days: 2)), firstDate: now, lastDate: now.add(const Duration(days: 365)));
+            if (d == null) return;
+            setState(() => _bestBefore = d);
+            if (ctx.mounted) Navigator.of(ctx).pop();
+          }
+
+          return SheetBody(
+            title: 'Ubah kategori',
             children: [
-              Text('Ubah kategori', style: AppTypography.titleL),
-              const SizedBox(height: 8),
               for (final c in FoodCategory.values)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  minTileHeight: 52,
-                  title: Text(c.label, style: AppTypography.text(16, weight: c == _category ? 700 : 500)),
-                  trailing: c == _category ? const Icon(LucideIcons.check, color: AppColors.primary) : null,
-                  onTap: () {
-                    setState(() => _category = c);
-                    Navigator.of(ctx).pop();
-                  },
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: OptionRow(title: c.title, subtitle: c.examples, selected: c == _category, onTap: () => pick(c)),
                 ),
+              AnimatedSize(
+                duration: Motion.of(ctx, Motion.base),
+                curve: Motion.move,
+                child: _category == FoodCategory.sealedFood
+                    ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const SizedBox(height: 6),
+                        Text('Baik digunakan sebelum', style: AppTypography.display(16, weight: 700)),
+                        const SizedBox(height: 8),
+                        OptionRow(
+                          title: _bestBefore == null ? 'dd/mm/yyyy' : formatLongDate(_bestBefore!),
+                          lead: OptionLead.icon,
+                          icon: LucideIcons.calendar,
+                          selected: false,
+                          onTap: pickDate,
+                        ),
+                      ])
+                    : const SizedBox(width: double.infinity),
+              ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -124,7 +164,6 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   @override
   Widget build(BuildContext context) {
     final capture = ref.watch(shareCaptureProvider);
-    final pickupPoint = ref.watch(sessionProvider.select((u) => u?.pickupPoint)) ?? 'Kos Melati, Pogung';
     final now = ref.watch(clockProvider)();
     final pending = capture?.result.verdict == AiVerdict.pendingReview;
 
@@ -175,7 +214,7 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                                 InkWell(
                                   onTap: _changeCategory,
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2), child: Text('Ubah', style: AppTypography.text(14, weight: 700, color: AppColors.primary).copyWith(decoration: TextDecoration.underline))),
+                                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2), child: Text('Ubah', style: AppTypography.text(14, weight: 700, color: AppColors.primary))),
                                 ),
                               ]),
                               const SizedBox(height: 2),
@@ -209,27 +248,31 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                       Expanded(child: Text('Makanan gratis memberi poin lebih banyak.', style: AppTypography.text(14, color: AppColors.inkMuted))),
                     ])
                   else
-                    Row(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 5,
-                          child: AppTextField(
-                            label: '',
-                            controller: _price,
-                            prefix: 'Rp',
-                            suffixText: '/porsi',
-                            errorText: _priceError,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: const [ThousandsFormatter()],
-                            onChanged: (_) => setState(() => _priceError = null),
-                          ),
+                        AppTextField(
+                          label: '',
+                          semanticLabel: 'Harga per porsi',
+                          controller: _price,
+                          prefix: 'Rp',
+                          suffixText: '/porsi',
+                          errorText: _priceError,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: const [ThousandsFormatter()],
+                          onChanged: (_) => setState(() => _priceError = null),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(flex: 3, child: AppCheckbox(value: _negotiable, label: 'Boleh ditawar', textSize: 13, onChanged: (v) => setState(() => _negotiable = v))),
+                        AppCheckbox(
+                          value: _negotiable,
+                          label: 'Boleh ditawar',
+                          textSize: 15,
+                          helper: 'Pembeli bisa ajukan harga lewat chat',
+                          onChanged: (v) => setState(() => _negotiable = v),
+                        ),
                       ],
                     ),
-                  const SizedBox(height: 16),
+                  // The checkbox row carries its own 10 px of padding, so the gap is shorter after it.
+                  SizedBox(height: _free ? 16 : 5),
                   Text('Ambil paling lambat jam', style: AppTypography.display(17, weight: 700)),
                   const SizedBox(height: 8),
                   TimeChips(times: _times, selected: _pickupBy, now: now, onSelected: (t) => setState(() => _pickupBy = t)),
@@ -237,7 +280,21 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                   Row(children: [
                     const Icon(LucideIcons.mapPin, size: 18, color: AppColors.primary),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('Titik ambil: $pickupPoint · dari profil', style: AppTypography.text(13, weight: 500, color: AppColors.inkMuted))),
+                    Expanded(
+                      child: FadeSwitch(
+                        child: Text('Titik ambil: ${_point.name}', key: ValueKey(_point.id), style: AppTypography.text(13, weight: 500, color: AppColors.inkMuted)),
+                      ),
+                    ),
+                    Semantics(
+                      button: true,
+                      label: 'Ubah titik ambil',
+                      excludeSemantics: true,
+                      child: InkWell(
+                        onTap: _changePoint,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4), child: Text('Ubah', style: AppTypography.text(14, weight: 700, color: AppColors.primary))),
+                      ),
+                    ),
                   ]),
                   if (_formError != null)
                     Padding(
@@ -253,11 +310,17 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
             ),
           ),
           StickyBottomBar(
+            compact: true,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Dengan membagikan, kamu menjamin makanan ini masih layak makan.', textAlign: TextAlign.center, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
-                const SizedBox(height: 12),
+                // The bar follows the text: one line on a wide phone, two on a narrow one (the Figma frame shows two). The space
+                // above (8, from StickyBottomBar) and between text and button (14) stays fixed: the text sits close to the bar's top line.
+                // Hidden while the keyboard is up: it would eat the form's visible area on a short phone.
+                if (MediaQuery.viewInsetsOf(context).bottom == 0) ...[
+                  Text('Dengan membagikan, kamu menjamin makanan ini masih layak makan.', textAlign: TextAlign.center, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
+                  const SizedBox(height: 14),
+                ],
                 AppButton(label: 'Bagikan sekarang', onPressed: _publish),
               ],
             ),

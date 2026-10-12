@@ -32,6 +32,3 @@ List<int> quickOffers(int price) {
   final amounts = {round500(price * 0.6), round500(price * 0.8)}.where((a) => a > 0 && a < price).toList()..sort();
   return amounts;
 }
-
-/// `PWN-XXXX` (4 digits). In the MVP this runs on device; later it must be generated server-side.
-String generatePickupCode(Random random) => 'PWN-${(1000 + random.nextInt(9000))}';

@@ -1,7 +1,7 @@
 import '../models/enums.dart';
 
 /// Assumptions for the open questions in PRD.md (tier thresholds, point rules, impact formula).
-/// Tier thresholds: Sobat Pawon 0, Food Savior 500, Pahlawan Pangan 1.500.
+/// Tier thresholds: Pawon Friend 0, Pawon Elite 500, Pawon Hero 1.500.
 const double kgPerPortion = 0.5;
 const int pointsPerPortion = 10;
 const int ratingBonusPoints = 5;

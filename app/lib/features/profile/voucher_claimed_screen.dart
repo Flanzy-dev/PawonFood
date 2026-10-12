@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/rewards_repository.dart';
 import '../../core/data/session_repository.dart';
 import '../../core/services/formatters.dart';
+import '../../core/motion/motion_widgets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
@@ -34,11 +34,11 @@ class VoucherClaimedScreen extends ConsumerWidget {
                         child: Column(
                           children: [
                             const SizedBox(height: 48),
-                            Container(width: 96, height: 96, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle), child: const Icon(LucideIcons.check, size: 48, color: AppColors.background)),
+                            const CheckBurst(size: 96, flood: true),
                             const SizedBox(height: 24),
                             Text('Voucher berhasil diklaim!', textAlign: TextAlign.center, style: AppTypography.display(26, height: 32)),
                             const SizedBox(height: 10),
-                            Text('Tunjukkan kode ini ke mitra saat membayar.', textAlign: TextAlign.center, style: AppTypography.bodyMuted),
+                            Text(voucher.reward.isFoodVoucher ? 'Pakai di Pembayaran saat mengambil makanan berbayar.' : 'Tunjukkan kode ini ke mitra saat membayar.', textAlign: TextAlign.center, style: AppTypography.bodyMuted),
                             const SizedBox(height: 28),
                             Container(
                               padding: const EdgeInsets.all(12),
@@ -64,6 +64,8 @@ class VoucherClaimedScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    AppButton(label: 'Kembali ke Profil', onPressed: () => context.go('/profile')),
+                    const SizedBox(height: 12),
                     AppButton(
                       label: 'Salin kode',
                       variant: AppButtonVariant.outline,
@@ -72,8 +74,6 @@ class VoucherClaimedScreen extends ConsumerWidget {
                         if (context.mounted) showAppSnack(context, 'Kode disalin.');
                       },
                     ),
-                    const SizedBox(height: 12),
-                    AppButton(label: 'Kembali ke Profil', onPressed: () => context.go('/profile')),
                   ],
                 ),
               ),

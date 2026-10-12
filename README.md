@@ -22,7 +22,7 @@ One app, two sides:
 - **Receivers (penerima):** open the map or the feed, find food within walking distance, take it for free or
   negotiate the price in chat, show the pickup code, then leave a review.
 - **Providers (penyedia):** photograph the leftovers, let the AI check the photo, share in three taps or fewer,
-  accept offers, and collect points that unlock tiers (Sobat Pawon → Food Savior → Pahlawan Pangan) and vouchers.
+  accept offers, and collect points that unlock tiers (Pawon Friend → Pawon Elite → Pawon Hero) and vouchers.
 
 Food photos come from the camera only. There is no gallery picker, so photos cannot be taken from the internet.
 

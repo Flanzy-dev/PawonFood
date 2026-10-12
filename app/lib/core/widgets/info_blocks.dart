@@ -22,9 +22,10 @@ class StatTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
-            Text(value, maxLines: 1, style: AppTypography.display(20, weight: 700, height: 26)),
-            Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
+            // Labels may wrap to a second line (three tiles share 360 dp); the value shrinks instead of clipping.
+            Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
+            FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, maxLines: 1, style: AppTypography.display(20, weight: 700, height: 26))),
+            Text(caption, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
           ],
         ),
       );
@@ -62,5 +63,25 @@ class PriceBox extends StatelessWidget {
             if (negotiable && price != 0) const Pill('Bisa ditawar', fill: AppColors.surface, color: AppColors.accentInk, height: 32, size: 14, weight: 700, hPad: 14),
           ],
         ),
+      );
+}
+
+/// Label on the left, amount on the right (payment breakdowns: "Harga disepakati", "Total").
+class AmountRow extends StatelessWidget {
+  const AmountRow(this.label, this.value, {super.key, this.strong = false});
+
+  final String label;
+  final String value;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(children: [
+          Expanded(
+            child: Text(label, style: strong ? AppTypography.display(17, weight: 700, height: 24) : AppTypography.text(15, height: 22, color: AppColors.inkMuted)),
+          ),
+          Text(value, style: strong ? AppTypography.display(17, weight: 700, height: 24) : AppTypography.text(15, weight: 700, height: 22)),
+        ]),
       );
 }

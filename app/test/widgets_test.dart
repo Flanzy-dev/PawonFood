@@ -28,7 +28,7 @@ void main() {
       await tester.pumpWidget(host(FoodCard(listing: l, distance: 296, onTap: () {})));
       expect(find.text('Ayam Goreng Sisa Katering'), findsOneWidget);
       expect(find.text('Warteg Bu Siti'), findsOneWidget);
-      expect(find.text('Pahlawan Pangan'), findsOneWidget);
+      expect(find.text('Pawon Hero'), findsOneWidget);
       expect(find.text('Rp15.000'), findsOneWidget);
       expect(find.text('Rp5.000'), findsOneWidget);
       expect(find.text('Sisa 2 porsi'), findsOneWidget);

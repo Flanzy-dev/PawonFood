@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../motion/motion.dart';
+import '../motion/pressable.dart';
 import '../services/formatters.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -41,50 +43,75 @@ class SegmentedControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 56,
+        // minHeight, not a fixed height: at large text sizes the labels need more room than 56.
+        constraints: const BoxConstraints(minHeight: 56),
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(color: AppColors.surfaceSand, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
-        child: Row(
-          children: [
-            for (var i = 0; i < options.length; i++)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: i == selected,
-                  label: options[i],
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onChanged(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: i == selected ? AppColors.surface : Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: i == selected ? const [BoxShadow(color: AppColors.shadow, blurRadius: 4, offset: Offset(0, 1))] : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(options[i], style: AppTypography.text(16, weight: i == selected ? 700 : 600, color: i == selected ? AppColors.ink : AppColors.inkMuted)),
-                          if (badges != null && badges![i] > 0) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 24,
-                              height: 24,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-                              child: Text('${badges![i]}', style: AppTypography.text(13, weight: 700, color: AppColors.background)),
+        child: Stack(alignment: Alignment.center, children: [
+          // The white thumb slides to the selected option instead of jumping.
+          Positioned.fill(
+            child: AnimatedAlign(
+              duration: Motion.of(context, Motion.base),
+              curve: Motion.move,
+              alignment: Alignment(options.length < 2 ? 0 : -1 + 2 * selected / (options.length - 1), 0),
+              child: FractionallySizedBox(
+                widthFactor: 1 / options.length,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 4, offset: Offset(0, 1))],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              for (var i = 0; i < options.length; i++)
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: i == selected,
+                    label: options[i],
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onChanged(i),
+                      child: Container(
+                        // Each option is as tall as the track's inside (56 - 2 x 6 padding - 2 x 1 border), so the label sits in the
+                        // middle of the white thumb and the whole option is the tap target. Taller only when large text needs it.
+                        constraints: const BoxConstraints(minHeight: 42),
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: AnimatedDefaultTextStyle(
+                                duration: Motion.of(context, Motion.base),
+                                style: AppTypography.text(16, weight: i == selected ? 700 : 600, color: i == selected ? AppColors.ink : AppColors.inkMuted),
+                                child: Text(options[i], textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
                             ),
+                            if (badges != null && badges![i] > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                                child: Text('${badges![i]}', style: AppTypography.text(13, weight: 700, color: AppColors.background)),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
+        ]),
       );
 }
 
@@ -107,7 +134,11 @@ class QtyStepper extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _RoundButton(icon: LucideIcons.minus, fill: AppColors.surfaceSand, color: AppColors.ink, label: 'Kurangi porsi', onTap: value > min ? () => onChanged(value - 1) : null),
-            Text('$value', style: AppTypography.text(20, weight: 700)),
+            AnimatedSwitcher(
+              duration: Motion.of(context, Motion.fast),
+              transitionBuilder: (child, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.7, end: 1.0).animate(a), child: child)),
+              child: Text('$value', key: ValueKey(value), style: AppTypography.text(20, weight: 700)),
+            ),
             _RoundButton(icon: LucideIcons.plus, fill: AppColors.primary, color: AppColors.background, label: 'Tambah porsi', onTap: value < max ? () => onChanged(value + 1) : null),
           ],
         ),
@@ -128,11 +159,15 @@ class _RoundButton extends StatelessWidget {
         button: true,
         enabled: onTap != null,
         label: label,
-        child: Material(
-          color: onTap == null ? fill.withValues(alpha: 0.5) : fill,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(onTap: onTap, child: SizedBox(width: 44, height: 44, child: Icon(icon, size: 22, color: color))),
+        child: Pressable(
+          enabled: onTap != null,
+          scale: 0.9,
+          child: Material(
+            color: onTap == null ? fill.withValues(alpha: 0.5) : fill,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(onTap: onTap, child: SizedBox(width: 44, height: 44, child: Icon(icon, size: 22, color: onTap == null ? color.withValues(alpha: 0.4) : color))),
+          ),
         ),
       );
 }
@@ -151,12 +186,12 @@ class TimeChips extends StatelessWidget {
         children: [
           for (var i = 0; i < times.length; i++) ...[
             if (i > 0) const SizedBox(width: 8),
-            Expanded(child: _chip(times[i])),
+            Expanded(child: _chip(context, times[i])),
           ],
         ],
       );
 
-  Widget _chip(DateTime t) {
+  Widget _chip(BuildContext context, DateTime t) {
     final enabled = t.isAfter(now);
     final on = selected != null && selected!.isAtSameMomentAs(t);
     return Semantics(
@@ -164,18 +199,28 @@ class TimeChips extends StatelessWidget {
       selected: on,
       enabled: enabled,
       label: 'Ambil paling lambat ${formatTime(t)}',
-      child: Material(
-        color: on ? AppColors.primary : AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: on ? AppColors.primary : AppColors.border)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: enabled ? () => onSelected(t) : null,
-          child: Container(
-            height: 52,
-            alignment: Alignment.center,
-            child: Text(
-              formatTime(t),
-              style: AppTypography.text(16, weight: 700, color: on ? AppColors.background : (enabled ? AppColors.ink : AppColors.inkMuted.withValues(alpha: 0.5))),
+      child: Pressable(
+        enabled: enabled,
+        child: AnimatedContainer(
+          duration: Motion.of(context, Motion.base),
+          curve: Motion.move,
+          decoration: ShapeDecoration(
+            color: on ? AppColors.primary : AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: on ? AppColors.primary : AppColors.border)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: enabled ? () => onSelected(t) : null,
+              child: Container(
+                height: 52,
+                alignment: Alignment.center,
+                child: Text(
+                  formatTime(t),
+                  style: AppTypography.text(16, weight: 700, color: on ? AppColors.background : (enabled ? AppColors.ink : AppColors.inkMuted.withValues(alpha: 0.5))),
+                ),
+              ),
             ),
           ),
         ),
@@ -184,19 +229,20 @@ class TimeChips extends StatelessWidget {
   }
 }
 
-/// Green checkbox with a label widget.
+/// Green checkbox with a label and an optional muted explanation line under it.
 class AppCheckbox extends StatelessWidget {
-  const AppCheckbox({super.key, required this.value, required this.onChanged, required this.label, this.textSize = 14});
+  const AppCheckbox({super.key, required this.value, required this.onChanged, required this.label, this.textSize = 14, this.helper});
 
   final bool value;
   final ValueChanged<bool> onChanged;
   final String label;
   final double textSize;
+  final String? helper;
 
   @override
   Widget build(BuildContext context) => Semantics(
         checked: value,
-        label: label,
+        label: helper == null ? label : '$label. $helper',
         child: InkWell(
           onTap: () => onChanged(!value),
           borderRadius: BorderRadius.circular(8),
@@ -208,19 +254,39 @@ class AppCheckbox extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 11),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
+                    duration: Motion.of(context, Motion.fast),
                     width: 22,
                     height: 22,
                     decoration: BoxDecoration(
                       color: value ? AppColors.primary : AppColors.surface,
                       borderRadius: BorderRadius.circular(6),
-                      border: value ? null : Border.all(color: AppColors.border, width: 1.5),
+                      border: value ? null : Border.all(color: AppColors.borderStrong, width: 1.5),
                     ),
-                    child: value ? const Icon(LucideIcons.check, size: 16, color: AppColors.background) : null,
+                    child: AnimatedScale(
+                      scale: value ? 1 : 0.5,
+                      duration: Motion.of(context, Motion.base),
+                      curve: value ? Motion.pop : Motion.exit,
+                      child: AnimatedOpacity(
+                        opacity: value ? 1 : 0,
+                        duration: Motion.of(context, Motion.base),
+                        child: const Icon(LucideIcons.check, size: 16, color: AppColors.background),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(label, style: AppTypography.text(textSize, weight: 500, height: textSize * 1.4)))),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label, style: AppTypography.text(textSize, weight: 500, height: textSize * 1.4)),
+                        if (helper != null) Text(helper!, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -248,9 +314,13 @@ class AppTextField extends StatefulWidget {
     this.focusNode,
     this.autofocus = false,
     this.textCapitalization = TextCapitalization.none,
+    this.semanticLabel,
   });
 
   final String label;
+
+  /// Name read by screen readers when the visible [label] is empty or not enough (e.g. the price field).
+  final String? semanticLabel;
   final TextEditingController? controller;
   final String? hint;
   final String? errorText;
@@ -285,7 +355,10 @@ class _AppTextFieldState extends State<AppTextField> {
           Text(widget.label, style: AppTypography.display(16, weight: 700, height: 22)),
           const SizedBox(height: 6),
         ],
-        TextField(
+        Semantics(
+          // The visible label is a separate Text, so the field would have no accessible name without this.
+          label: widget.semanticLabel ?? (widget.label.isNotEmpty ? widget.label : widget.hint),
+          child: TextField(
           controller: widget.controller,
           focusNode: widget.focusNode,
           autofocus: widget.autofocus,
@@ -315,17 +388,21 @@ class _AppTextFieldState extends State<AppTextField> {
                     icon: _obscured ? const FluentEyeOffIcon() : const FluentEyeIcon(),
                   )
                 : null,
-            enabledBorder: border(hasError ? AppColors.error : AppColors.border, hasError ? 1.5 : 1),
+            enabledBorder: border(hasError ? AppColors.error : AppColors.borderStrong, hasError ? 1.5 : 1),
             focusedBorder: border(hasError ? AppColors.error : AppColors.primary, 1.5),
           ),
         ),
+        ),
         if (hasError) ...[
           const SizedBox(height: 6),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.triangleAlert, size: 16, color: AppColors.error)),
-            const SizedBox(width: 6),
-            Expanded(child: Text(widget.errorText!, style: AppTypography.text(13, weight: 600, height: 18, color: AppColors.error))),
-          ]),
+          Semantics(
+            liveRegion: true,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.triangleAlert, size: 16, color: AppColors.error)),
+              const SizedBox(width: 6),
+              Expanded(child: Text(widget.errorText!, style: AppTypography.text(13, weight: 600, height: 18, color: AppColors.error))),
+            ]),
+          ),
         ] else if (widget.helperText != null) ...[
           const SizedBox(height: 6),
           Text(widget.helperText!, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),

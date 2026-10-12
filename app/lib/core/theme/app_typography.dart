@@ -4,6 +4,10 @@ import 'app_colors.dart';
 
 /// Type scale from DESIGN_SYSTEM.md. Headings use Bricolage Grotesque, UI text uses Inter.
 /// Both are variable fonts, so weight is set through [FontVariation].
+/// The system text scale (1.0 at the default size), capped at 2x. Fixed-geometry widgets size themselves with it so text
+/// that grows with the user's font setting is never clipped.
+double textScaleOf(BuildContext context) => (MediaQuery.textScalerOf(context).scale(16) / 16).clamp(1.0, 2.0);
+
 abstract final class AppTypography {
   static const _display = 'BricolageGrotesque';
   static const _ui = 'Inter';

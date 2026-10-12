@@ -20,6 +20,10 @@ final randomProvider = Provider<Random>((ref) => Random());
 /// How long the simulated counterpart takes to answer in chat.
 final simulatedReplyDelayProvider = Provider<Duration>((ref) => const Duration(milliseconds: 1500));
 
+/// How long the simulated QR scan takes: the receiver's camera finding the code (B10b), and the mock receiver
+/// scanning the provider's QR (C17).
+final simulatedScanDelayProvider = Provider<Duration>((ref) => const Duration(milliseconds: 2500));
+
 /// Demo switch for the simulated AI validator (long-press the camera title).
 final demoAiModeProvider = StateProvider<DemoAiMode>((ref) => DemoAiMode.normal);
 

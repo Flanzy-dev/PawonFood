@@ -29,3 +29,12 @@ const locations = [
   SavedLocation('Sagan, Yogyakarta', LatLng(-7.7690, 110.3790)),
   SavedLocation('Condongcatur, Sleman', LatLng(-7.7420, 110.3950)),
 ];
+
+/// Neighbourhood of a point ("Pogung"): listings show only the area until a reservation is accepted (privacy rule).
+String areaOf(LatLng p) {
+  var best = locations.first;
+  for (final l in locations) {
+    if (distanceMeters(p, l.position) < distanceMeters(p, best.position)) best = l;
+  }
+  return best.name.split(',').first;
+}

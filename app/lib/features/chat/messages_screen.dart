@@ -7,6 +7,7 @@ import '../../core/data/chat_repository.dart';
 import '../../core/data/listings_repository.dart';
 import '../../core/data/providers.dart';
 import '../../core/models/conversation.dart';
+import '../../core/motion/entrance.dart';
 import '../../core/models/enums.dart';
 import '../../core/services/formatters.dart';
 import '../../core/theme/app_colors.dart';
@@ -58,7 +59,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               ),
             )
           else
-            for (final c in threads) _ThreadRow(conversation: c, asReceiver: _tab == 0),
+            for (final (i, c) in threads.indexed)
+              FadeSlideIn(key: ValueKey('$_tab-${c.id}'), index: i, child: _ThreadRow(conversation: c, asReceiver: _tab == 0)),
           const SizedBox(height: 16),
           const SafetyBanner(text: 'Tawar dan atur waktu ambil di sini saja. Jangan transfer uang di luar aplikasi sebelum makanan kamu terima.'),
         ],
@@ -87,7 +89,9 @@ class _ThreadRow extends ConsumerWidget {
     final unread = c.unread > 0;
     return Semantics(
       button: true,
-      label: '${other.name}, ${listing.name}, ${c.status.label}',
+      label: '${other.name}, ${listing.name}, ${c.status.label}${unread ? ', belum dibaca' : ''}${last == null ? '' : ', ${last.body}'}',
+      onTap: () => context.push('/chat/${c.id}'),
+      excludeSemantics: true,
       child: InkWell(
         onTap: () => context.push('/chat/${c.id}'),
         child: Container(
@@ -110,6 +114,8 @@ class _ThreadRow extends ConsumerWidget {
                     Text('${listing.name} · $price', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.text(14, height: 20, color: AppColors.inkMuted)),
                     const SizedBox(height: 6),
                     Row(children: [
+                      // Unread is a dot as well as bold text, so it never relies on weight alone.
+                      if (unread) Container(width: 10, height: 10, margin: const EdgeInsets.only(right: 8), decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
                       Expanded(
                         child: Text(
                           last?.body ?? 'Belum ada pesan',

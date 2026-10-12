@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/reward.dart';
+import '../motion/entrance.dart';
+import '../motion/pressable.dart';
 import '../services/rewards.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -12,7 +15,14 @@ import '../theme/app_typography.dart';
       _ => (AppColors.surfaceSand, AppColors.accentInk),
     };
 
-/// Big colored tile with the reward label ("Rp", "Ojek", "Hijau"): the card image and the detail hero.
+/// Lucide icon for a reward tile (hi-fi D17): basket for shopping, bike for delivery, award for the certificate.
+IconData rewardIcon(Reward r) => switch (r.tile) {
+      'Ojek' => LucideIcons.bike,
+      'Hijau' => LucideIcons.award,
+      _ => LucideIcons.shoppingBasket,
+    };
+
+/// Big colored tile with the reward icon: the card image and the detail hero.
 class RewardTile extends StatelessWidget {
   const RewardTile(this.reward, {super.key, this.radius = 14, this.fontSize = 28, this.faded = false});
 
@@ -29,7 +39,7 @@ class RewardTile extends StatelessWidget {
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(radius)),
-        child: Text(reward.tile, style: AppTypography.display(fontSize, color: fg)),
+        child: Icon(rewardIcon(reward), size: fontSize * 1.2, color: fg, semanticLabel: reward.tile),
       ),
     );
   }
@@ -51,41 +61,44 @@ class RewardCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: '${reward.title}, $costText',
-      child: Material(
-        color: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppColors.border)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: SizedBox.expand(child: RewardTile(reward, faded: short > 0))),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 40),
-                    child: Text(reward.cardTitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTypography.display(15, weight: 700, height: 20)),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: 2, right: 2, bottom: 2),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      costText,
-                      textAlign: TextAlign.right,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.text(13, weight: short > 0 ? 700 : 500, height: 16, color: short > 0 ? AppColors.accentInk : AppColors.inkMuted),
+      child: Pressable(
+        scale: 0.97,
+        child: Material(
+          color: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppColors.border)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: SizedBox.expand(child: RewardTile(reward, faded: short > 0))),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 40),
+                      child: Text(reward.cardTitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTypography.display(15, weight: 700, height: 20)),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2, right: 2, bottom: 2),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        costText,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.text(13, weight: short > 0 ? 700 : 500, height: 16, color: short > 0 ? AppColors.accentInk : AppColors.inkMuted),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -109,7 +122,10 @@ class RewardGrid extends StatelessWidget {
           return Wrap(
             spacing: 12,
             runSpacing: 12,
-            children: [for (final r in rewards) SizedBox(width: side, height: side, child: RewardCard(reward: r, points: points, onTap: () => onTap(r)))],
+            children: [
+              for (final (i, r) in rewards.indexed)
+                FadeSlideIn(key: ValueKey('${r.id}#$i'), index: i, child: SizedBox(width: side, height: side, child: RewardCard(reward: r, points: points, onTap: () => onTap(r)))),
+            ],
           );
         },
       );

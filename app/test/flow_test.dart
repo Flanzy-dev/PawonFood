@@ -9,7 +9,7 @@ import 'package:pawonfood/features/share/share_done_screen.dart';
 
 import 'support.dart';
 
-/// The core receiver journey through the real UI: login -> feed -> detail -> take -> pickup code -> picked up -> review.
+/// The core receiver journey through the real UI: login -> feed -> detail -> take -> pay -> scan QR -> review -> ad.
 void main() {
   setUpAll(loadAppFonts);
 
@@ -34,7 +34,7 @@ void main() {
     expect(find.text('150 Poin'), findsOneWidget);
     expect(find.text('Segera habis di sekitarmu'), findsOneWidget);
 
-    // B8 Detail: the consent checkbox is required before taking the food
+    // B8 Detail
     final list = find.descendant(of: find.byType(ListView).first, matching: find.byType(Scrollable)).first;
     await tester.scrollUntilVisible(find.text('Ayam Goreng Lalapan'), 200, scrollable: list);
     await tester.tap(find.text('Ayam Goreng Lalapan'));
@@ -42,18 +42,28 @@ void main() {
     expect(find.text('Tawar cepat'), findsOneWidget);
     expect(find.text('Rp4.000'), findsOneWidget);
     expect(find.text('Rp5.500'), findsOneWidget);
-    await tester.tap(find.text('Ambil · Rp7.000'));
-    await tester.pumpAndSettle();
-    expect(find.text('Centang persetujuan dulu untuk melanjutkan.'), findsOneWidget);
-    await tester.tap(find.textContaining('Saya telah memeriksa kondisi makanan'));
-    await tester.pumpAndSettle();
+    expect(find.text('Deskripsi'), findsOneWidget);
     await tester.tap(find.text('Ambil · Rp7.000'));
     await tester.pumpAndSettle();
 
-    // B10 Chat: accepted card with a pickup code
-    expect(find.text('Tawaran Rp7.000 diterima'), findsOneWidget);
-    expect(find.textContaining(RegExp(r'^PWN-\d{4}$')), findsOneWidget);
-    await tester.tap(find.text('Sudah saya ambil'));
+    // B10 Chat: reserved, the receiver picks how to pay
+    expect(find.text('Ambil Rp7.000 disetujui'), findsOneWidget);
+    await tester.tap(find.text('Pilih cara bayar'));
+    await tester.pumpAndSettle();
+
+    // B10d Pembayaran: the button stays off until the food-condition consent is checked
+    expect(find.text('Rincian'), findsOneWidget);
+    expect(tester.widget<InkWell>(find.widgetWithText(InkWell, 'Pakai tunai di tempat')).onTap, isNull);
+    await tester.tap(find.textContaining('Saya telah memeriksa kondisi makanan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(InkWell, 'Pakai tunai di tempat'));
+    await tester.pumpAndSettle();
+
+    // Back in the chat: scan the provider's QR (decoding is simulated)
+    expect(find.textContaining('Bayar Rp7.000 tunai di tempat'), findsOneWidget);
+    await tester.tap(find.text('Pindai QR'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
     // B11 Ulasan
@@ -61,8 +71,15 @@ void main() {
     expect(tester.widget<InkWell>(find.widgetWithText(InkWell, 'Kirim ulasan')).onTap, isNull);
     await tester.tap(find.bySemanticsLabel('4 bintang'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Penyedia mendapat 15 poin'), findsOneWidget);
+    expect(find.textContaining('Pengambilan berhasil'), findsOneWidget);
     await tester.tap(find.widgetWithText(InkWell, 'Kirim ulasan'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400)); // not pumpAndSettle: the video ad would play to the end
+
+    // B11b/B11c: one full-screen ad, closable after 5 seconds
+    expect(find.text('Iklan'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.tap(find.textContaining(RegExp(r'^(Tutup|Lewati)$')));
     await tester.pumpAndSettle();
 
     // Back on Beranda (scroll position is kept); the listing now has one portion less (3 -> 2)
@@ -83,7 +100,7 @@ void main() {
 
     await tester.tap(find.text('Pogung, Sleman'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ListTile, 'Condongcatur, Sleman'));
+    await tester.tap(find.text('Condongcatur, Sleman'));
     await tester.pumpAndSettle();
     expect(find.text('Belum ada makanan di radius 1 km'), findsOneWidget);
 
@@ -189,16 +206,4 @@ void main() {
     expect(find.text('Bagikan lagi'), findsNothing);
     expect(find.textContaining('Kamu dapat poin'), findsOneWidget);
   });
-}
-
-/// Signs in through the real login screen and lands on Beranda.
-Future<void> signIn(WidgetTester tester) async {
-  await tester.pumpWidget(appUnderTest());
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Sudah punya akun? Masuk'));
-  await tester.pumpAndSettle();
-  await tester.enterText(find.byType(TextField).at(0), 'rafi@email.com');
-  await tester.enterText(find.byType(TextField).at(1), 'rahasia123');
-  await tester.tap(find.widgetWithText(InkWell, 'Masuk'));
-  await tester.pumpAndSettle();
 }

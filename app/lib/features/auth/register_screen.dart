@@ -110,11 +110,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             if (_roleError != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Row(children: [
-                  const Icon(LucideIcons.triangleAlert, size: 16, color: AppColors.error),
-                  const SizedBox(width: 6),
-                  Text(_roleError!, style: AppTypography.text(13, weight: 600, color: AppColors.error)),
-                ]),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.triangleAlert, size: 16, color: AppColors.error)),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text(_roleError!, style: AppTypography.text(13, weight: 600, height: 18, color: AppColors.error))),
+                  ]),
+                ),
               ),
             const SizedBox(height: 24),
             AppButton(label: 'Buat akun', onPressed: blocked ? null : _submit),

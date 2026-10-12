@@ -1,10 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../models/listing.dart';
+import '../motion/motion.dart';
 import '../services/formatters.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -33,7 +35,7 @@ ColorFilter _tileTint() {
   return ColorFilter.matrix([...m, 0, 0, 0, 1, 0]);
 }
 
-/// Map used on Beranda (mini, non-interactive, teardrop pins) and Peta (full, price-label pins and clusters).
+/// Map used on Beranda (mini, non-interactive, price pins) and Peta (full, tappable price pins and clusters).
 class PawonMap extends ConsumerStatefulWidget {
   const PawonMap({
     super.key,
@@ -48,6 +50,7 @@ class PawonMap extends ConsumerStatefulWidget {
     this.userPosition,
     this.onTapMap,
     this.attributionBottom = 4,
+    this.keepClear,
   });
 
   final LatLng center;
@@ -63,6 +66,12 @@ class PawonMap extends ConsumerStatefulWidget {
 
   /// Distance of the OSM credit from the bottom edge (the full map lifts it above the navigation bar).
   final double attributionBottom;
+
+  /// Mini map only: areas covered by overlays (radius label, map button) that price pins must not sit under.
+  final List<Rect> Function(Size size)? keepClear;
+
+  /// The mini map shows at most this many price pins.
+  static const miniPins = 2;
 
   @override
   ConsumerState<PawonMap> createState() => _PawonMapState();
@@ -84,16 +93,91 @@ class _PawonMapState extends ConsumerState<PawonMap> {
     }
   }
 
+  /// Label shown on a listing's price pin.
+  static String _label(Listing l) => l.isFree ? 'Gratis' : formatRupiah(l.price);
+
+  /// Mini map callouts: for the nearest listings, a small dot on the exact spot and the price pill beside it (right,
+  /// left, above or below, whichever side is free). At this zoom everything within 1 km sits close to the user dot,
+  /// so a pill centred on its point would cover the dot or another pill. Pills stay fully on the map and clear of each
+  /// other, the dots, the user dot and the [PawonMap.keepClear] overlays. Returns each listing with the pill's
+  /// top-left relative to the listing's point.
+  List<(Listing, Offset)> _miniCallouts(Size size, LatLng user) {
+    final c = widget.center, mpp = metersPerPixel(c.latitude, _zoom);
+    final cosLat = math.cos(c.latitude * math.pi / 180);
+    Offset toPx(LatLng p) => Offset(size.width / 2 + (p.longitude - c.longitude) * 111320 * cosLat / mpp, size.height / 2 - (p.latitude - c.latitude) * 110574 / mpp);
+    final style = AppTypography.text(15, weight: 700);
+    final taken = <Rect>[Rect.fromCircle(center: toPx(user), radius: 16), ...?widget.keepClear?.call(size)];
+    final bounds = (Offset.zero & size).deflate(4);
+    final out = <(Listing, Offset)>[];
+    for (final l in widget.listings) {
+      if (out.length == PawonMap.miniPins) break;
+      final tp = TextPainter(text: TextSpan(text: _label(l), style: style), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+      final w = tp.width + 31, p = toPx(l.position), dot = Rect.fromCircle(center: p, radius: 6);
+      tp.dispose();
+      if (!bounds.contains(p) || taken.any((t) => t.overlaps(dot))) continue;
+      const gap = _calloutGap;
+      for (final off in [const Offset(gap, -_pinH / 2), Offset(-gap - w, -_pinH / 2), Offset(-w / 2, -gap - _pinH), Offset(-w / 2, gap)]) {
+        final r = (p + off) & Size(w, _pinH);
+        if (!bounds.contains(r.topLeft) || !bounds.contains(r.bottomRight) || taken.any((t) => t.inflate(4).overlaps(r))) continue;
+        taken..add(r)..add(dot);
+        out.add((l, off));
+        break;
+      }
+    }
+    return out;
+  }
+
+  static const _pinH = 36.0, _calloutGap = 10.0;
+
+  /// A mini-map callout: the dot sits on the listing's point (the marker's centre), the pill at [off] from it.
+  Marker _callout(Listing l, Offset off) {
+    const w = 280.0, h = 2 * (_pinH + _calloutGap) + 8;
+    final label = _label(l);
+    return Marker(
+      point: l.position,
+      width: w,
+      height: h,
+      child: IgnorePointer(
+        child: Semantics(
+          label: '${l.name}, $label',
+          excludeSemantics: true,
+          child: Stack(clipBehavior: Clip.none, children: [
+            Positioned(
+              left: w / 2 - 5,
+              top: h / 2 - 5,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: l.isFree ? AppColors.primary : AppColors.accent,
+                  border: Border.all(color: AppColors.surface, width: 2),
+                ),
+              ),
+            ),
+            Positioned(left: w / 2 + off.dx, top: h / 2 + off.dy, child: _PricePin(label: label, free: l.isFree)),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!widget.mini) return _map(null);
+    return LayoutBuilder(builder: (_, box) => _map(box.biggest));
+  }
+
+  Widget _map(Size? miniSize) {
     final tiles = ref.watch(tilesEnabledProvider);
     final user = widget.userPosition ?? widget.center;
     // The selected listing always stays a single, highlighted pin drawn on top; the rest may cluster.
     final rest = [for (final l in widget.listings) if (l.id != widget.selectedId) l];
     final picked = [for (final l in widget.listings) if (l.id == widget.selectedId) l];
-    final clusters = widget.mini
-        ? [for (final l in widget.listings) MapCluster(l)]
+    final clusters = miniSize != null
+        ? const <MapCluster>[]
         : [...clusterListings(rest, 72 * metersPerPixel(widget.center.latitude, _zoom)), for (final l in picked) MapCluster(l)];
+    final callouts = miniSize != null ? _miniCallouts(miniSize, user) : const <(Listing, Offset)>[];
     return FlutterMap(
       mapController: _controller,
       options: MapOptions(
@@ -109,16 +193,10 @@ class _PawonMapState extends ConsumerState<PawonMap> {
         },
       ),
       children: [
-        if (tiles)
-          TileLayer(
-            urlTemplate: _tileUrl,
-            userAgentPackageName: _userAgentPackage,
-            tileBuilder: (context, tile, _) => ColorFiltered(colorFilter: _tileTint(), child: tile),
-            errorTileCallback: (_, _, _) {}, // offline: keep the sand background instead of logging every tile
-          ),
+        if (tiles) pawonTileLayer(),
         PolygonLayer(polygons: [
           Polygon(
-            points: _circle(widget.center, widget.radiusMeters),
+            points: circlePoints(widget.center, widget.radiusMeters),
             color: AppColors.primary.withValues(alpha: 0.1),
             borderColor: AppColors.primaryDark,
             borderStrokeWidth: 2.5,
@@ -128,57 +206,34 @@ class _PawonMapState extends ConsumerState<PawonMap> {
         MarkerLayer(markers: [
           for (final c in clusters)
             if (c.isSingle) _pin(c.listings.first) else _cluster(c),
-          Marker(point: user, width: 28, height: 28, child: const _UserDot()),
+          for (final (l, off) in callouts) _callout(l, off),
+          Marker(point: user, width: 28, height: 28, child: const UserDot()),
         ]),
-        Align(
-          alignment: Alignment.bottomLeft,
-          child: Padding(
-            padding: EdgeInsets.only(left: 6, bottom: widget.attributionBottom),
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(color: AppColors.background.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(4)),
-                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), child: Text('© OpenStreetMap contributors', style: AppTypography.text(10, color: AppColors.inkMuted))),
-              ),
-            ),
-          ),
-        ),
+        OsmCredit(bottom: widget.attributionBottom),
       ],
     );
   }
 
   Marker _pin(Listing l) {
-    if (widget.mini) {
-      return Marker(
-        point: l.position,
-        width: 28,
-        height: 36,
-        alignment: Alignment.topCenter,
-        child: SvgPicture.string(_teardrop(l.isFree ? '#2F5D39' : '#B15732'), semanticsLabel: l.name),
-      );
-    }
-    final label = l.isFree ? 'Gratis' : formatRupiah(l.price);
+    final label = _label(l);
     final selected = l.id == widget.selectedId;
     return Marker(
       point: l.position,
       width: 124,
-      height: 40,
+      height: 44, // tap target
       child: Semantics(
         button: true,
+        selected: selected,
         label: '${l.name}, $label',
         child: GestureDetector(
           onTap: () => widget.onSelect?.call(l),
+          // The selected pin grows a little and turns green, so the eye follows the tap.
           child: Center(
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: selected ? AppColors.primary : AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
-                border: selected ? null : Border.all(color: l.isFree ? AppColors.primary : AppColors.accent, width: 1.5),
-                boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 6, offset: Offset(0, 2))],
-              ),
-              child: Text(label, softWrap: false, maxLines: 1, style: AppTypography.text(15, weight: 700, color: selected ? AppColors.background : AppColors.ink)),
+            child: AnimatedScale(
+              scale: selected ? 1.08 : 1,
+              duration: Motion.of(context, Motion.base),
+              curve: Motion.pop,
+              child: _PricePin(label: label, free: l.isFree, selected: selected),
             ),
           ),
         ),
@@ -209,19 +264,95 @@ class _PawonMapState extends ConsumerState<PawonMap> {
         ),
       );
 
-  /// Circle of [meters] around [center] as a polygon (flutter_map circles cannot be dashed).
-  static List<LatLng> _circle(LatLng center, double meters) {
-    const distance = Distance();
-    return [for (var deg = 0; deg < 360; deg += 4) distance.offset(center, meters, deg.toDouble())];
-  }
+}
 
-  static String _teardrop(String hex) =>
-      '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.2 0 13.8 0 24 14 36 14 36s14-12 14-22.2C28 6.2 21.7 0 14 0Z" fill="$hex"/><circle cx="14" cy="13.5" r="5" fill="#fff"/></svg>';
+/// OSM tiles tinted into the cream/sand palette (shared by every map in the app).
+TileLayer pawonTileLayer() => TileLayer(
+      urlTemplate: _tileUrl,
+      userAgentPackageName: _userAgentPackage,
+      tileBuilder: (context, tile, _) => ColorFiltered(colorFilter: _tileTint(), child: tile),
+      errorTileCallback: (_, _, _) {}, // offline: keep the sand background instead of logging every tile
+    );
+
+/// Circle of [meters] around [center] as a polygon (flutter_map circles cannot be dashed).
+List<LatLng> circlePoints(LatLng center, double meters) {
+  const distance = Distance();
+  return [for (var deg = 0; deg < 360; deg += 4) distance.offset(center, meters, deg.toDouble())];
+}
+
+/// Teardrop map pin as SVG ([hex] fill, white hole).
+/// Price-label pin: white pill with an accent border (green for free food), filled green when selected.
+class _PricePin extends StatelessWidget {
+  const _PricePin({required this.label, required this.free, this.selected = false});
+
+  final String label;
+  final bool free;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+        duration: Motion.of(context, Motion.base),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: selected ? null : Border.all(color: free ? AppColors.primary : AppColors.accent, width: 1.5),
+          boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 6, offset: Offset(0, 2))],
+        ),
+        child: Text(label, softWrap: false, maxLines: 1, style: AppTypography.text(15, weight: 700, color: selected ? AppColors.background : AppColors.ink)),
+      );
+}
+
+String teardropSvg(String hex, {double scale = 1}) =>
+    '<svg xmlns="http://www.w3.org/2000/svg" width="${28 * scale}" height="${36 * scale}" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.2 0 13.8 0 24 14 36 14 36s14-12 14-22.2C28 6.2 21.7 0 14 0Z" fill="$hex"/><circle cx="14" cy="13.5" r="5" fill="#fff"/></svg>';
+
+/// "© OpenStreetMap contributors", required on every map.
+class OsmCredit extends StatelessWidget {
+  const OsmCredit({super.key, this.bottom = 4});
+
+  final double bottom;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.bottomLeft,
+        child: Padding(
+          padding: EdgeInsets.only(left: 6, bottom: bottom),
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: AppColors.background.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(4)),
+              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), child: Text('© OpenStreetMap contributors', style: AppTypography.text(10, color: AppColors.inkMuted))),
+            ),
+          ),
+        ),
+      );
+}
+
+/// White label pill next to a map marker ("Kamu", "Warteg Bu Siti", "Titik ambil").
+class MapLabel extends StatelessWidget {
+  const MapLabel(this.text, {super.key, this.outlined = false});
+
+  final String text;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: outlined ? Border.all(color: AppColors.primaryDark, width: 1.2) : null,
+          boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 4, offset: Offset(0, 1))],
+        ),
+        child: Center(widthFactor: 1, child: Text(text, maxLines: 1, softWrap: false, style: AppTypography.text(13, weight: 700, color: AppColors.primaryDark))),
+      );
 }
 
 /// The user's location: green dot in a white ring.
-class _UserDot extends StatelessWidget {
-  const _UserDot();
+class UserDot extends StatelessWidget {
+  const UserDot({super.key});
 
   @override
   Widget build(BuildContext context) => Semantics(

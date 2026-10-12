@@ -19,11 +19,13 @@ ProviderContainer signedIn() {
 
 void main() {
   group('reward catalog', () {
-    test('has six rewards and the chips filter them by category', () {
+    test('has eight rewards and the chips filter them by category', () {
       final c = signedIn();
-      expect(c.read(filteredRewardsProvider).length, 6);
+      expect(c.read(filteredRewardsProvider).length, 8);
       c.read(rewardFilterProvider.notifier).state = RewardFilter.antar;
       expect([for (final r in c.read(filteredRewardsProvider)) r.id], ['r_ojek', 'r_ongkir']);
+      c.read(rewardFilterProvider.notifier).state = RewardFilter.makanan;
+      expect([for (final r in c.read(filteredRewardsProvider)) r.id], ['r_makan3', 'r_makan5']);
       c.read(rewardFilterProvider.notifier).state = RewardFilter.sertifikat;
       expect([for (final r in c.read(filteredRewardsProvider)) r.id], ['r_sertifikat']);
     });

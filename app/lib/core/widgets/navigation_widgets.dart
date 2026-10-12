@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../motion/motion.dart';
+import '../motion/pressable.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'brand.dart';
@@ -32,13 +34,17 @@ class RoundIconButton extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
         button: true,
         label: semanticLabel,
-        child: DecoratedBox(
-          decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: shadow ? const [BoxShadow(color: AppColors.shadow, blurRadius: 8, offset: Offset(0, 2))] : null),
-          child: Material(
-            color: fill,
-            shape: CircleBorder(side: borderColor == null ? BorderSide.none : BorderSide(color: borderColor!)),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(onTap: onTap, child: SizedBox(width: size, height: size, child: Icon(icon, size: 24, color: iconColor))),
+        child: Pressable(
+          enabled: onTap != null,
+          scale: 0.92,
+          child: DecoratedBox(
+            decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: shadow ? const [BoxShadow(color: AppColors.shadow, blurRadius: 8, offset: Offset(0, 2))] : null),
+            child: Material(
+              color: fill,
+              shape: CircleBorder(side: borderColor == null ? BorderSide.none : BorderSide(color: borderColor!)),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(onTap: onTap, child: SizedBox(width: size, height: size, child: Icon(icon, size: 24, color: iconColor))),
+            ),
           ),
         ),
       );
@@ -74,7 +80,9 @@ class StepProgress extends StatelessWidget {
       );
 }
 
-const double navBarHeight = 86;
+/// Height of the bar above the system gesture inset: icon + label plus a little air, so the bar sits close to the
+/// gesture line instead of leaving dead space under the labels.
+const double navBarHeight = 68;
 const double _fabRise = 30;
 
 /// Bottom space a tab screen should leave so content is not hidden behind the nav bar.
@@ -114,9 +122,22 @@ class PawonBottomNav extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Column(children: [
-                Icon(icon, size: 24, color: color),
+                // The active icon takes the green; the change eases instead of snapping. No bounce: tabs are tapped all day.
+                TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(end: color),
+                  duration: Motion.of(context, Motion.base),
+                  builder: (_, c, _) => Icon(icon, size: 24, color: c),
+                ),
                 const SizedBox(height: 4),
-                Text(label, style: AppTypography.text(12, weight: on ? 700 : 500, color: color)),
+                // Tab labels stop growing at 1.3x: the bar is a fixed 68 dp and a 2x label would overflow it.
+                MediaQuery.withClampedTextScaling(
+                  maxScaleFactor: 1.3,
+                  child: AnimatedDefaultTextStyle(
+                    duration: Motion.of(context, Motion.base),
+                    style: AppTypography.text(12, weight: on ? 700 : 500, color: color),
+                    child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
               ]),
             ),
           ),
@@ -152,7 +173,13 @@ class PawonBottomNav extends StatelessWidget {
                     child: Column(children: [
                       const SizedBox(height: 24),
                       const SizedBox(height: 4),
-                      Text('Bagikan', style: AppTypography.text(12, weight: 700, color: AppColors.primary)),
+                      // The FAB above already says "Bagikan makanan" to screen readers; this caption is only a visual label.
+                      ExcludeSemantics(
+                        child: MediaQuery.withClampedTextScaling(
+                          maxScaleFactor: 1.3,
+                          child: Text('Bagikan', maxLines: 1, style: AppTypography.text(12, weight: 700, color: AppColors.primary)),
+                        ),
+                      ),
                     ]),
                   ),
                 ),
@@ -171,17 +198,20 @@ class PawonBottomNav extends StatelessWidget {
                 label: 'Bagikan makanan',
                 child: GestureDetector(
                   onTap: onShare,
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(color: AppColors.background, shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 10, offset: Offset(0, -2))]),
+                  child: Pressable(
+                    scale: 0.92,
                     child: Container(
-                      width: 62,
-                      height: 62,
+                      width: 72,
+                      height: 72,
                       alignment: Alignment.center,
-                      decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                      child: const PawonLogo(size: 36, color: AppColors.background),
+                      decoration: const BoxDecoration(color: AppColors.background, shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 10, offset: Offset(0, -2))]),
+                      child: Container(
+                        width: 62,
+                        height: 62,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                        child: const PawonLogo(size: 36, color: AppColors.background),
+                      ),
                     ),
                   ),
                 ),
