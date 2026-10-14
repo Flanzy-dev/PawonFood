@@ -14,9 +14,10 @@ PawonFood is a hyperlocal surplus-food sharing app ("Dari dapur ke dapur") built
 - Motion lives in `app/lib/core/motion/` (rules in DESIGN_SYSTEM.md → Motion). Use those widgets and tokens instead of ad-hoc durations, and keep every animation off under `Motion.reduced`.
 - Don't run `dart format` on existing files: this SDK's formatter uses the tall style and rewrites code written in the older 160-column style.
 - The AI photo check in the app is **simulated** (`FoodValidator` interface). The real YOLO/TFLite model comes from `/ml`.
+- `/render` is a headless render engine with no npm dependencies: canvas scenes → headless Chrome over CDP → ffmpeg MP4. It makes the 20 s 9:16 pitch-video ad with a code-synthesized soundtrack, every cut on a 120 BPM grid (`npm run render:ad`, then `npm run review:ad` to check dead frames and beat lock; VO script and CapCut guide in [render/AD.md](render/AD.md)) and the 8 s feature promo in landscape and portrait (`npm run render`, `npm run render:portrait`, `npm run preview`). It reads fonts and photos from `app/assets`, and the ad's Figma-AI watercolours from `render/web/media/`. All motion uses closed-form springs (`render/web/spring.js`); easing curves are banned there. See [render/README.md](render/README.md). Local only, like the other root folders.
 - Not yet created: `/web` (Next.js/TypeScript), `/ml` (Python, YOLOv8 → TFLite).
 - `.fallow/` is a generated cache from the fallow analyzer. Don't edit it.
-- This directory is not a git repository.
+- Git: only `/app` is a repository (GitHub `Flanzy-dev/PawonFood`, app contents at the repo root). The root folder, its docs, `reference/` and `.claude/` are local only and must not be pushed. The old root history is kept locally in `.git-old-backup/`.
 
 ## Design Work
 

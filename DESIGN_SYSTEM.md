@@ -1,5 +1,5 @@
 
-# Design System
+# Design system
 
 Source: `PawonFood UI apps.pdf` (mobile) and `PawonFood UI.pdf` (landing page). Hex values were sampled from the mockups.
 
@@ -57,7 +57,7 @@ Mobile scale (390pt-wide frame):
 
 Web scale: hero display ~64/68, H2 ~40/48, body 18/28.
 
-## Spacing & Radius
+## Spacing & radius
 
 - 4/8 spacing system: 4, 8, 12, 16, 24, 32, 48, 64. Screen side padding is 16.
 - Radius:
@@ -72,9 +72,9 @@ Web scale: hero display ~64/68, H2 ~40/48, body 18/28.
 
 States for every interactive component: default, pressed, focused, disabled, loading.
 
-#### Navigation
+### Navigation
 
-- *Bottom nav*: 5 items (Beranda, Peta, **Bagikan**, Pesan, Profil).
+- *Bottom nav*: 5 items (Beranda, Peta, Bagikan, Pesan, Profil).
   - 68 dp tall plus the system gesture inset. The mockups draw the inset as a 24 px area under the bar with the Android
     gesture handle (a 108 x 4 pill, 8 px above the bottom edge) on every phone screen.
   - Bagikan is a raised green circular FAB with the PawonFood logo.
@@ -82,7 +82,7 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - *Top bar*: back button (white circle), centered title, optional action.
 - *Step progress*: "Langkah N dari 3" with 3 segments (green when done, sand when pending).
 
-#### Inputs & controls
+### Inputs & controls
 
 - *Search field*: white, rounded, search icon, placeholder "Cari lauk, nasi, roti...".
 - *Filter chips*: pill shape. Active is filled `--primary` with white text; inactive is white with a border. Scroll horizontally.
@@ -92,18 +92,18 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - *Price input*: full-width field with "Rp" prefix and "/porsi" suffix. Under it sits the "Boleh ditawar" checkbox row with a muted line "Pembeli bisa ajukan harga lewat chat" (`AppCheckbox.helper`).
 - *Time chips*: equal-width options (19.00 / 20.30 / 22.00). The selected chip is filled green.
 
-#### Buttons
+### Buttons
 
 - *Primary*: filled `--primary`, cream/white text, 16 radius, 52–56 tall (e.g. "Bagikan sekarang", "Ambil · Rp5.000").
 - *Outline*: white with a green outline (e.g. "Chat"). *Accent outline*: terracotta outline (e.g. "Tawar lagi").
 - *Pill CTA*: compact green pill ("Lihat peta penuh", "Lihat detail").
 - *Sticky bottom bar*: a white bar holding the main CTAs on detail and share screens.
 
-#### Content
+### Content
 
 - *Food card*:
   - Left: square photo with an "✓ AI" white badge (top) and a terracotta "Sisa N porsi" badge (bottom).
-  - Right: name, provider, tier tag, ~~original price~~ and the bold price (or **GRATIS**), a chat icon, and a distance pill.
+  - Right: name, provider, tier tag, ~~original price~~ and the bold price (or "GRATIS"), a chat icon, and a distance pill.
 - *Badges / pills*:
   - Tier tag: `--success-tint` background, green text.
   - Distance pill: sand.
@@ -118,7 +118,7 @@ States for every interactive component: default, pressed, focused, disabled, loa
   bisa jalan kaki" label and a round green 48 px button bottom-right with the
   fluent:full-screen-maximize-16-filled icon (accessible label "Lihat peta penuh").
 
-#### Chat
+### Chat
 
 - *Own bubble*: green with white text. *Other bubble*: white with a border. Timestamps sit below in caption style.
 - *Offer bubble*: a green card with "Tawaran kamu", a big price and details.
@@ -131,7 +131,7 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - *Thread row*: avatar, name, time, item · price, last message, plus a status label (Tawaran diterima / Siap diambil / Habis).
 - *Safety banner*: muted note about not transferring money outside the app.
 
-#### Profile
+### Profile
 
 - *Level card*: shows the current tier and points, the "[X] poin lagi" text, and a tier stepper: a line through three
   dots with the caption and tier name under each (Sekarang / Berikutnya / Top Impact).
@@ -139,7 +139,9 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - *Reward row*: icon, title, cost and a "Tukar" button.
 - *Settings list rows*.
 
-**AI camera** (step 1 of the share flow)
+### AI camera
+
+Step 1 of the share flow.
 
 - Dark full-screen layout (`--camera-bg`) with a rounded preview.
 - Light-green bounding box labeled with the detected category (e.g. "Lauk matang").
@@ -149,7 +151,7 @@ States for every interactive component: default, pressed, focused, disabled, loa
 
 ## Motion
 
-Purposeful and quiet: motion explains a change (what appeared, what was pressed, where a screen came from). No
+Motion is quiet and explains a change (what appeared, what was pressed, where a screen came from). No
 confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/motion.dart`.
 
 | Token | Value | Use |
@@ -190,10 +192,10 @@ confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/moti
   - Free ("Gratis"): white with a green outline.
   - Selected: filled green.
 - The user location is a green dot in a white ring, inside a dashed 1 km radius circle.
-- Dense areas use a **cluster** with a count instead of stacked pins.
+- Dense areas use a cluster with a count instead of stacked pins.
 - The selected pin opens a bottom preview card (photo, name, provider · porsi · deadline, price, walking time). Tapping the card opens the detail; there is no separate button.
 
-## Voice & Copy
+## Voice & copy
 
 - Casual Indonesian addressed as "kamu". Short, warm and practical.
   Examples: "Lapar? Masih ada yang hangat di dekatmu.", "Semua sudah diisi. Cek sebentar, lalu bagikan."
@@ -202,7 +204,7 @@ confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/moti
   Filters (Semua makanan only): *Bisa jalan kaki*, *Sedang hangat*, *Makan gratis*.
 - Prices: `Rp5.000` (dot thousands separator). Times: `20.30` (dot). Distance: `300 m`, `± 4 mnt jalan kaki`.
 
-## Landing Page
+## Landing page
 
 Sections of `PawonFood UI.pdf`, from top to bottom:
 

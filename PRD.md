@@ -1,11 +1,11 @@
-# Product Requirements Document
+# Product requirements document
 
-Source of truth for the product idea: [CONCEPT.md](reference/CONCEPT.md). This PRD turns it into requirements.
+This PRD turns the product idea in [CONCEPT.md](reference/CONCEPT.md), its source of truth, into requirements.
 
-## Product Overview
+## Product overview
 
-Product: PawonFood
-Tagline: "Hyperlocal Community Food Rescue Platform". Slogan: *Dari dapur ke dapur. Masak kebanyakan? Bagikan, jangan buang.*
+PawonFood's tagline is "Hyperlocal Community Food Rescue Platform", and its slogan is *Dari dapur ke dapur. Masak kebanyakan?
+Bagikan, jangan buang.*
 
 PawonFood is a hyperlocal food-rescue platform. It connects households, F&B businesses and communities that have
 edible surplus food with people nearby who need it, either for free or at an affordable price.
@@ -14,27 +14,32 @@ edible surplus food with people nearby who need it, either for free or at an aff
 - Goal: turn surplus food into useful food before it becomes waste.
 - One app, two sides: receivers (penerima) and providers (penyedia).
 - Starts in Pogung (Sleman, near UGM), then all of Yogyakarta.
-- Built for a sustainability hackathon at UGM. Supports **SDG 2 (Zero Hunger)** and **SDG 12 (Responsible Consumption)**.
+- Built for a sustainability hackathon at UGM. Supports SDG 2 (Zero Hunger) and SDG 12 (Responsible Consumption).
 - Sources: [CONCEPT.md](reference/CONCEPT.md), [Product.md](reference/Product.md),
   [Evaluasi Ide Aplikasi PawonFood.md](<reference/Evaluasi%20Ide%20Aplikasi%20PawonFood.md>),
   `PawonFood UI apps.pdf` (app screens), `PawonFood UI.pdf` (landing page).
 
-**Positioning.** PawonFood is a food-rescue network that runs from the kitchen to the community. Price gets the food
-picked up. Copy, marketing and UI must not present PawonFood as a cheap-food app or a discount marketplace.
+**Positioning.** PawonFood is a food-rescue network that runs from the kitchen to the community. The price is there to get the
+food picked up. Copy, marketing and UI must not present PawonFood as a cheap-food app or a discount marketplace.
 
 **Final statement.** PawonFood is a location-based food-rescue platform that connects households, F&B businesses and
 communities with people nearby, to rescue edible surplus food through free sharing or affordable prices.
 
-## Background & Problem
+## Background & problem
 
-- Bappenas estimates Indonesia's food loss and waste at roughly **23–48 million tonnes per year** (2000–2019).
-  Consumption is the largest source of food waste, at roughly **5–19 million tonnes per year**, so PawonFood targets
-  households first.
+- Bappenas's food loss and waste study ([Laporan Kajian Food Loss and Waste di Indonesia](https://greeneconomy.bappenas.go.id/home/books/laporan-kajian-food-loss-and-waste-in-indonesia-dalam-rangka-mendukung-penerapan-ekonomi-sirkular-dan-pembangunan-rendah-karbon/),
+  2021) puts Indonesia's food loss and waste at 23–48 million tonnes per year over 2000–2019, or 115–184 kg per person
+  per year.
+  - It costs Rp213–551 trillion per year (4–5% of GDP). Over the period it produced 1,702.9 Mt CO₂e, on average 7.29%
+    of national greenhouse gas emissions. The wasted food could have fed 61–125 million people (29.47% of the
+    population).
+  - Consumption is the largest stage, at 5–19 million tonnes per year, and about 80% of it comes from households (the
+    rest from restaurants and catering). So PawonFood targets households first.
 - Households, warung, catering and ibu kos regularly cook too much. Edible leftovers end up in the trash.
 - Students living in kos (anak kos) need cheap meals and often have no motorbike.
 - Existing players (Surplus, DamoGO) only take surplus from formal restaurants and bakeries at fixed prices.
   Garda Pangan relies on volunteers and manual logistics. None of them serves the household kitchen.
-- **Core problem: food safety + trust.** Strangers share food only when they believe it is safe and the handover is
+- The core problem is food safety and trust. Strangers share food only when they believe it is safe and the handover is
   reliable. The team judges every feature below against this.
 
 ## Stakeholders
@@ -50,7 +55,7 @@ communities with people nearby, to rescue edible surplus food through free shari
 
 Later, receivers extend to anyone with a limited food budget.
 
-## Product Concept
+## Product concept
 
 ### Food categories
 
@@ -65,23 +70,23 @@ Later, receivers extend to anyone with a limited food budget.
 
 | Method      | In the UI                                         | Rule                                                            |
 | ----------- | ------------------------------------------------- | --------------------------------------------------------------- |
-| Free        | "Gratis" toggle, price shown as **GRATIS** | Price is 0. Earns the most points.                              |
+| Free        | "Gratis" toggle, price shown as "GRATIS" | Price is 0. Earns the most points.                              |
 | Fixed price | "Jual murah" with a price per porsi               | Price ≥ 0, with the original price struck through              |
 | Make offer  | "Boleh ditawar" checkbox, "Tawar cepat" chips     | Receiver proposes a price in chat, provider accepts or declines |
 
 No method carries a platform or admin fee: PawonFood takes Rp0 from both the provider and the receiver. The price is
 the provider's own food price and goes entirely to the provider.
 
-## User Flow
+## User flow
 
 Each step links to the feature that implements it:
 
 | #  | Step                                              | Feature                                             |
-| -- | ------------------------------------------------- | --------------------------------------------------- |
+| --- | ------------------------------------------------- | --------------------------------------------------- |
 | 1  | A household or F&B has surplus food               | Bagikan (Core Feature 2)                            |
 | 2  | PawonFood checks eligibility and time information | AI photo check, pickup deadline, provider guarantee |
 | 3  | The nearest people find the food                  | Beranda feed, Peta (1 km radius)                    |
-| 4  | Free or very cheap                                | Transaction methods                                 |
+| 4  | Free or cheap                                     | Transaction methods                                 |
 | 5  | Reserve                                           | Reserve & pickup (Core Feature 6)                   |
 | 6  | Safe pickup                                       | Pickup point from the profile, walking distance     |
 | 7  | QR confirmation (receiver scans)                  | Reserve & pickup (Core Feature 6)                   |
@@ -89,10 +94,10 @@ Each step links to the feature that implements it:
 | 9  | The provider earns impact points                  | Profil & gamification (Core Feature 8)              |
 | 10 | Waste goes down and the food gets used            | Impact stats                                        |
 
-## Key Challenges & Responses
+## Key challenges & responses
 
-The product must handle these eight aspects. The product team wrote the items marked **Proposed** because the source
-concept does not specify them. They are open for review (see Open Questions) and none is built yet.
+The product must handle these eight aspects. The product team wrote the items marked Proposed because the source
+concept does not specify them. They are open for review (see Open questions) and none is built yet.
 
 | Aspect        | Challenge                                                                 | Response                                                                                                                                                                             |
 | ------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -105,7 +110,7 @@ concept does not specify them. They are open for review (see Open Questions) and
 | Social stigma | Receivers may feel ashamed to ask for free food                           | **Proposed:** free listings look like any other listing. No "needy" or charity labels. Free food is framed as a rescue, and receivers earn points too                          |
 | No-show       | Reserved food that nobody collects is wasted again                        | **Proposed:** a reservation lasts only until the pickup deadline, then it expires and the food reopens. Repeated no-shows lower the receiver's rating and reservation priority |
 
-## Core Features
+## Core features
 
 Each feature maps to a screen in `PawonFood UI apps.pdf`.
 
@@ -146,7 +151,7 @@ Each feature maps to a screen in `PawonFood UI apps.pdf`.
      posts the offer in the chat as "Menunggu jawaban"; the portions are reserved only once the provider accepts.
      The minimum offer is an open question.
    - "Deskripsi": a short description from the provider (e.g. what the food is, how it is stored). The share form
-     (Step 2) has no description field yet, see Open Questions.
+     (Step 2) has no description field yet, see Open questions.
    - Sticky actions: *Chat* (outline) and *Ambil · Rp5.000* (primary). *Ambil* creates a reservation (Core Feature 6).
 4. **Map / Peta**
 
@@ -202,7 +207,7 @@ Each feature maps to a screen in `PawonFood UI apps.pdf`.
 8. **Profile / Profil & gamification**
 
    - Role "Penerima dan penyedia · Pogung, Sleman".
-   - Level card with tier progress: **Pawon Friend → Pawon Elite → Pawon Hero** ("[X] poin lagi untuk naik ke Pawon Elite").
+   - Level card with tier progress: Pawon Friend → Pawon Elite → Pawon Hero ("[X] poin lagi untuk naik ke Pawon Elite").
    - Impact stats: porsi dibagikan, porsi diselamatkan, kg batal jadi sampah.
    - **Impact points** go to the provider when a pickup is confirmed by QR scan. Free food earns more points.
      Receivers also earn points when they pick up food and rate it well.
@@ -230,14 +235,14 @@ ready (Figma lo-fi B11b).
   When the video ends, the app returns to Beranda.
 - **Content:** eco-friendly FMCG sponsors only, matching the revenue stream. No health claims about food, and no
   alcohol or tobacco (**Proposed**).
-- **Rules (Proposed):** at most one ad per receiver per day, no ads for providers, no ads inside the QR flow, and the
-  ad never delays saving the review.
+- **Rules (Proposed):** at most one ad per receiver per day, no ads for providers, no ads inside the QR flow, and saving
+  the review does not wait for the ad.
 
-## Trust & Food Safety
+## Trust & food safety
 
-These rules address the core problem, food safety + trust.
+These rules address the core problem, food safety and trust.
 
-- PawonFood is an **intermediary / bulletin board**, not a food producer.
+- PawonFood is an intermediary (a bulletin board), not a food producer.
 - Photos are taken with the camera only and validated by AI. Photos from the internet or non-food objects are rejected.
 - Providers confirm the guarantee line before publishing.
 - Receivers accept a ToS checkbox on the payment screen (cash or in-app), right above the confirm button, e.g. "Saya
@@ -248,9 +253,9 @@ These rules address the core problem, food safety + trust.
   receiver was at the pickup point on time and releases impact points. A QR works once and only for its reservation.
 - Payment is cash on pickup in the MVP.
 - Rating-based enforcement for providers with poor quality: suspension first, then a block if it repeats.
-- **Never call providers "Borjuis".** The tier names above replace it.
+- Never call providers "Borjuis". The tier names above replace it.
 
-## Business Model (Business Model Canvas)
+## Business model (Business Model Canvas)
 
 | Component              | PawonFood                                                                                                                                                                           |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -277,7 +282,7 @@ These rules address the core problem, food safety + trust.
 Pitch line: *"Surplus fokus menyelamatkan croissant dari bakery mewah. PawonFood fokus menyelamatkan sayur lodeh sisa
 masak ibu kos dan lauk warteg untuk anak kos di akhir bulan."*
 
-## MVP Scope
+## MVP scope
 
 **In scope (core journey):** Upload food → YOLO validation → listing appears on map/feed → negotiate → reserve →
 QR-confirmed pickup.
@@ -291,7 +296,7 @@ QR-confirmed pickup.
 **Where the built app stands against this PRD** (updated 2026-10-07, when the app was brought to all 75 Figma hi-fi
 screens):
 
-- Built beyond the MVP scope, as **simulated** flows on mock data (no backend, no gateway): QRIS payment, password
+- Built beyond the MVP scope, as simulated flows on mock data (no backend, no gateway): QRIS payment, password
   reset, the post-review ad (image and video variants, at most one a day), settings and help screens.
 - Categories: all three exist (chips *All · Ready-to-Eat · Fresh Ingredient · Sealed Food*, and "Ubah kategori" with
   "Baik digunakan sebelum"). The AI validator still knows only two classes, so sealed food is picked by hand.
@@ -300,7 +305,7 @@ screens):
 - Proposed rules: listings show only the area until a reservation exists; reservations expire at the deadline and
   reopen the portions. The rating penalty for repeated no-shows is not built.
 
-## Success Metrics
+## Success metrics
 
 - Portions saved (porsi diselamatkan) and kg of food kept out of the trash
 - Active providers per area, listings per day
@@ -310,12 +315,12 @@ screens):
 - Average provider rating; share of photos rejected by AI
 - Impact estimate for the pitch: "Jika 50 warung bergabung, X kg makanan terselamatkan per bulan, Y kg emisi metana berkurang."
 
-## Open Questions
+## Open questions
 
 - Mockup placeholders to fill: `[RATING]` format, `[X] poin` tier thresholds and reward costs, `[X] kg` impact formula,
   `[Nama kamu]`, `[EMAIL TIM]`.
 - Point rules (per portion? bonus for free food?) and the review threshold for a suspension, how long it lasts, and the threshold for a block.
-- Confirm the **Proposed** Privacy, Social stigma and No-show rules with the team.
+- Confirm the proposed Privacy, Social stigma and No-show rules with the team.
 - QR details: whether the window is the provider's pickup deadline or a shorter fixed time after reserving.
 - **Proposed** anti-fraud: require the receiver to be near the pickup point when scanning (GPS radius), because someone
   could photograph the QR and scan it from far away.

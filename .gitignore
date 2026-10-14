@@ -13,7 +13,15 @@ key.properties
 google-services.json
 GoogleService-Info.plist
 
-# Source material kept local only
-reference/
+# Third-party tooling
 stop-slop/
 skills-lock.json
+
+# Own repository (GitHub Flanzy-dev/PawonFood)
+app/
+
+# Backup of the old root history
+.git-old-backup/
+
+# Generated renders
+render/out/

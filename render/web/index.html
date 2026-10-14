@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PawonFood render</title>
+    <link rel="icon" href="data:," />
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+      #hud {
+        display: none;
+      }
+      /* Preview chrome only; capture mode shows the bare canvas at its exact pixel size. */
+      body.preview {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        font: 14px system-ui, sans-serif;
+      }
+      body.preview canvas {
+        max-width: 94vw;
+        max-height: calc(100vh - 96px);
+        width: auto;
+        height: auto;
+      }
+      body.preview #hud {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: min(94vw, 960px);
+        color: #fff;
+      }
+      #scrub {
+        flex: 1;
+      }
+      #time {
+        font-variant-numeric: tabular-nums;
+        min-width: 140px;
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="hud">
+      <button id="play" type="button">Pause</button>
+      <input id="scrub" type="range" min="0" value="0" aria-label="Frame" />
+      <span id="time"></span>
+    </div>
+    <script type="module" src="engine.js"></script>
+  </body>
+</html>

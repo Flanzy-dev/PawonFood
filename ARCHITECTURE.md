@@ -1,6 +1,6 @@
 # Architecture
 
-## System Overview
+## System overview
 
 ```text
 Receiver / Provider                         Visitor
@@ -17,11 +17,11 @@ Flutter mobile app                    Next.js landing site
 External services:
 
 - Maps: Google Maps SDK or `flutter_map` (OSM). The MVP uses mock coordinates around Pogung.
-- AI: YOLOv8 Nano exported to TFLite, running **on-device** via `flutter_vision`. No server cost.
+- AI: YOLOv8 Nano exported to TFLite, running on-device via `flutter_vision`. No server cost.
 - Payments (post-MVP): QRIS via Midtrans / Xendit, with no transaction fee. The MVP is cash on pickup.
 - Web hosting: Vercel (Next.js).
 
-## AI Food Validator
+## AI food validator
 
 Purpose:
 
@@ -55,7 +55,7 @@ Decision rule (identical on device and in the optional server validator):
 Optional server-side validator: a small Python service running the same `ultralytics` model with the same rule.
 It re-checks uploads when the backend exists.
 
-## Project Structure
+## Project structure
 
 ```text
 /app                      # Flutter mobile app (Dart)
@@ -82,7 +82,7 @@ It re-checks uploads when the backend exists.
 /docs                     # Project documentation and design PDFs
 ```
 
-## Data Model
+## Data model
 
 | Entity                 | Key fields                                                                                                                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -97,16 +97,18 @@ It re-checks uploads when the backend exists.
 
 Listing status: `available → reserved → picked_up`, or `expired` once past `pickup_by`, or `habis` when no portions are left.
 
-## Key Flows
+## Key flows
 
-**Share (provider).** Target: 3 taps or fewer.
+### Share (provider)
+
+Target: 3 taps or fewer.
 
 1. Tap the Bagikan FAB. The camera opens; gallery upload is disabled.
 2. The live YOLO preview shows the detected class. The provider takes the photo and the validation rule runs.
 3. The form is pre-filled (category, portions, price, pickup time, pickup point). The provider confirms and publishes.
 4. The listing appears in the feed and on the map.
 
-#### Claim (receiver)
+### Claim (receiver)
 
 1. Open a listing from the feed or map.
 2. Make an offer or start a chat. The provider accepts.
@@ -117,7 +119,7 @@ Listing status: `available → reserved → picked_up`, or `expired` once past `
    the review, and the provider earns points. A scan after the deadline expires the reservation and reopens the
    portions. There is no code to read out.
 
-## Data Flow
+## Data flow
 
 1. User interacts with the UI
 2. App validates input locally (and runs the YOLO check for photos)
@@ -126,7 +128,7 @@ Listing status: `available → reserved → picked_up`, or `expired` once past `
 5. Response returns to the UI
 6. UI handles success, loading (including the "AI sedang memindai..." scan state), empty and error states
 
-## Security Notes
+## Security notes
 
 - Camera-only capture for listing photos. Never accept gallery or file uploads for listings.
 - Authorization is enforced server-side (RLS): providers edit only their own listings, and only conversation members read messages.

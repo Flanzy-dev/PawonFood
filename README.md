@@ -6,14 +6,14 @@ PawonFood is a hyperlocal surplus-food sharing app. It connects home kitchens, w
 students, within walking distance, so edible leftovers get eaten instead of thrown away. It starts in Pogung
 (Sleman, near UGM) and is meant to grow to all of Yogyakarta.
 
-Built for a UGM sustainability hackathon. It supports **SDG 2 (Zero Hunger)** and **SDG 12 (Responsible Consumption)**.
+Built for a UGM sustainability hackathon. It supports SDG 2 (Zero Hunger) and SDG 12 (Responsible Consumption).
 
 ## The problem
 
 - Households, warung, catering and ibu kos regularly cook too much, and the leftovers end up in the trash.
 - Students living in kos need cheap meals and often have no motorbike.
-- Existing apps only take surplus from formal restaurants and bakeries at fixed prices. Nobody serves the grassroots
-  household kitchen.
+- Existing apps only take surplus from formal restaurants and bakeries at fixed prices. None of them take food
+  from household kitchens.
 
 ## How it works
 
@@ -31,7 +31,7 @@ Food photos come from the camera only. There is no gallery picker, so photos can
 | Part | State |
 | --- | --- |
 | Mobile app, [`app/`](app/) | MVP done: 18+ screens, full journey on mock data, 74 tests passing |
-| AI photo check | **Simulated** behind a `FoodValidator` interface. The real YOLOv8 → TFLite model is not built yet |
+| AI photo check | Simulated behind a `FoodValidator` interface. The real YOLOv8 → TFLite model is not built yet |
 | Landing page (`web/`) | Designed in Figma, not coded yet (Next.js / TypeScript planned) |
 | ML (`ml/`) | Not started (Python, YOLOv8 → TFLite) |
 | Backend | None. Everything is in-memory mock data (Supabase is planned, see [ARCHITECTURE.md](ARCHITECTURE.md)) |
@@ -72,6 +72,6 @@ folder structure) is in [app/README.md](app/README.md).
 
 ## Conventions
 
-- UI copy is **Indonesian**. Code, comments and docs are **English**.
+- UI copy is Indonesian. Code, comments and docs are English.
 - Use the theme tokens from the design system. Do not hardcode colors or font sizes in widgets.
 - Never expose API keys. Keep secrets in `.env` or `--dart-define`, never in the repo.
