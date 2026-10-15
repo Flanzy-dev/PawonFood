@@ -105,7 +105,7 @@ file yet. It was written to match the existing tone.
 
 Listing photos come from the live camera only. There is no gallery picker anywhere.
 
-## Assumptions (open questions in PRD.md)
+## Assumptions (open questions in PRD_PawonFood.md)
 
 | Topic | Value |
 | --- | --- |

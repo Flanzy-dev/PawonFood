@@ -6,7 +6,7 @@ PawonFood is a hyperlocal surplus-food sharing app ("Dari dapur ke komunitas") b
 
 ## Repo State
 
-- Spec docs at the root: [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [AGENTS.md](AGENTS.md). Read them before building anything.
+- Spec docs at the root: [PRD_PawonFood.md](PRD_PawonFood.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [AGENTS.md](AGENTS.md). Read them before building anything.
 - [reference/](reference/) holds source material. AGENTS.md mentions `Product.md`, the evaluation doc and the UI PDFs without a path. They all live in `reference/`.
   - Use `Evaluasi Ide Aplikasi PawonFood.md` (cleaned). Ignore the `(raw)` file, which has corrupted text.
   - `PawonFood UI apps.pdf` (mobile) and `PawonFood UI.pdf` (landing page) are the visual source of truth.

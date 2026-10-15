@@ -1,6 +1,6 @@
 import '../models/enums.dart';
 
-/// Assumptions for the open questions in PRD.md (tier thresholds, point rules, impact formula).
+/// Assumptions for the open questions in PRD_PawonFood.md (tier thresholds, point rules, impact formula).
 /// Tier thresholds: Pawon Friend 0, Pawon Elite 500, Pawon Hero 1.500.
 const double kgPerPortion = 0.5;
 const int pointsPerPortion = 10;

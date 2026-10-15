@@ -1,6 +1,6 @@
 # Naskah video pitch PawonFood (2 menit)
 
-Sumber: [reference/VIDEO.md](reference/VIDEO.md), [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [reference/Evaluasi Ide Aplikasi PawonFood.md](<reference/Evaluasi Ide Aplikasi PawonFood.md>).
+Sumber: [reference/VIDEO.md](reference/VIDEO.md), [PRD_PawonFood.md](PRD_PawonFood.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [reference/Evaluasi Ide Aplikasi PawonFood.md](<reference/Evaluasi Ide Aplikasi PawonFood.md>).
 
 ## Ringkasan
 
@@ -196,7 +196,7 @@ Ketiga pembicara berdiri dalam satu bingkai. Masing-masing mengucapkan satu bagi
 
 1. **Status YOLO.** Naskah B2 menyebut "YOLO di ponsel memeriksa fotonya" lalu mengakui "pemeriksaan fotonya masih simulasi". Menurut CLAUDE.md, pemeriksaan foto di aplikasi saat ini simulasi (model sebenarnya dari `/ml`). Kalau model sudah terpasang saat rekaman, ubah kalimat jadi "sudah berjalan dengan dua kelas".
 2. **Nama pembicara, peran, nama tim, universitas, email.** Semua masih placeholder.
-3. **Kutipan Bappenas.** Angka 23–48 juta ton dan 80% (tahap konsumsi) dari PRD.md, laporan Bappenas 2021. Cek ulang angka di sumber sebelum dibacakan.
+3. **Kutipan Bappenas.** Angka 23–48 juta ton dan 80% (tahap konsumsi) dari PRD_PawonFood.md, laporan Bappenas 2021. Cek ulang angka di sumber sebelum dibacakan.
 4. **Foto orang.** Kalau A2 memakai foto, wajib ada izin. Alternatifnya, pakai ilustrasi.
 5. **Lisensi musik dan efek suara.**
 

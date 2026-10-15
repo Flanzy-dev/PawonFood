@@ -3,7 +3,7 @@
 
 ## Before You Start
 
-- Read PRD.md
+- Read PRD_PawonFood.md
 - Read DESIGN_SYSTEM.md
 - Read ARCHITECTURE.md
 - Read Product.md and `Evaluasi Ide Aplikasi PawonFood.md`. Use the cleaned evaluation doc. Ignore the `(raw)` file,
