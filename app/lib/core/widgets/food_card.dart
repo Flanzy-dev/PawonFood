@@ -20,9 +20,12 @@ TextStyle struckStyle(double size) =>
 /// Price in the bottom-right corner of a card: the struck-through original price stacked above the price,
 /// right-aligned. Free food shows GRATIS alone.
 class CardPrice extends StatelessWidget {
-  const CardPrice(this.listing, {super.key});
+  const CardPrice(this.listing, {super.key, this.priceSize = 20});
 
   final Listing listing;
+
+  /// Font size of the price (the map's floating card uses 22, like the Peta preview card in the design).
+  final double priceSize;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +35,7 @@ class CardPrice extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         if (!l.isFree && l.originalPrice != null) Text(formatRupiah(l.originalPrice!), style: struckStyle(13)),
-        if (l.isFree) Text('GRATIS', style: AppTypography.display(22, color: AppColors.primary)) else Text(formatRupiah(l.price), style: AppTypography.display(20, weight: 700)),
+        if (l.isFree) Text('GRATIS', style: AppTypography.display(22, color: AppColors.primary)) else Text(formatRupiah(l.price), style: AppTypography.display(priceSize, weight: 700)),
       ],
     );
   }
@@ -53,7 +56,7 @@ class FoodCard extends ConsumerWidget {
     final label = foodLabelFor(l, ref.watch(clockProvider)());
     return Semantics(
       button: true,
-      label: '${l.name}, ${l.provider.name}, ${l.isFree ? 'gratis' : formatRupiah(l.price)}${l.negotiable ? ', bisa ditawar' : ''}, sisa ${l.portionsLeft} porsi, ${formatDistance(distance)}',
+      label: '${l.name}${label == null ? '' : ', ${label.label.toLowerCase()}'}, ${l.provider.name}, ${l.isFree ? 'gratis' : formatRupiah(l.price)}${l.negotiable ? ', bisa ditawar' : ''}${l.canDeliver ? ', bisa diantar' : ''}, sisa ${l.portionsLeft} porsi, ${formatDistance(distance)}',
       child: Pressable(
         scale: 0.98,
         child: Material(
@@ -99,7 +102,10 @@ class FoodCard extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 Text(l.provider.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.text(14, height: 20, color: AppColors.inkMuted)),
                                 const SizedBox(height: 4),
-                                Align(alignment: Alignment.centerLeft, child: TierTag(l.provider.tier)),
+                                Row(children: [
+                                  TierTag(l.provider.tier),
+                                  if (l.canDeliver) ...[const SizedBox(width: 6), const DeliveryTag()],
+                                ]),
                               ],
                             ),
                           ),

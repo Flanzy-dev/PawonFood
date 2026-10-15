@@ -161,6 +161,75 @@ void main() {
       expect(point.position.longitude, closeTo(spot.longitude, 1e-6));
     });
 
+    testWidgets('the search is a white page with Riwayat and Rekomendasi; a pick goes to Riwayat, back closes it', (tester) async {
+      await openPicker(tester, FakeLocator(const LocationProblem(LocationIssue.denied)));
+      final search = find.byType(TextField).first;
+      await tester.tap(search);
+      await tester.pumpAndSettle();
+      expect(find.text('Rekomendasi'), findsOneWidget);
+      expect(find.text('Riwayat'), findsNothing, reason: 'nothing picked yet');
+      expect(find.text('Pilih lokasi ini'), findsNothing, reason: 'the page covers the panel');
+
+      await tester.tap(find.text('Masjid Pogung Raya'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rekomendasi'), findsNothing, reason: 'picking closes the suggestions');
+      final c = ProviderScope.containerOf(tester.element(find.byType(MapPickerScreen)));
+      expect(c.read(recentPlacesProvider).first.name, 'Masjid Pogung Raya');
+
+      // Open again and clear the text with ✕: the history is on top, without its own place under Rekomendasi.
+      await tester.tap(search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Hapus pencarian'));
+      await tester.pumpAndSettle();
+      expect(find.text('Riwayat'), findsOneWidget);
+      expect(find.text('Rekomendasi'), findsOneWidget);
+      expect(find.text('Masjid Pogung Raya'), findsOneWidget);
+
+      // The back arrow closes the search first.
+      await tester.tap(find.bySemanticsLabel('Kembali'));
+      await tester.pumpAndSettle();
+      expect(find.text('Riwayat'), findsNothing);
+      expect(find.text('Pilih lokasi ini'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 300)); // the map's double-tap window
+    });
+
+    testWidgets('Riwayat rows can be removed one by one or all at once', (tester) async {
+      await openPicker(tester, FakeLocator(const LocationProblem(LocationIssue.denied)));
+      final c = ProviderScope.containerOf(tester.element(find.byType(MapPickerScreen)));
+      final recents = c.read(recentPlacesProvider.notifier);
+      recents.add(searchablePlaces[1]);
+      recents.add(searchablePlaces[2]);
+      await tester.tap(find.byType(TextField).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Riwayat'), findsOneWidget);
+      expect(find.byTooltip('Hapus dari riwayat'), findsNWidgets(2));
+
+      await tester.tap(find.byTooltip('Hapus dari riwayat').first);
+      await tester.pumpAndSettle();
+      expect(c.read(recentPlacesProvider), hasLength(1));
+
+      await tester.tap(find.text('Hapus semua'));
+      await tester.pumpAndSettle();
+      expect(c.read(recentPlacesProvider), isEmpty);
+      expect(find.text('Riwayat'), findsNothing);
+      expect(find.text('Rekomendasi'), findsOneWidget);
+    });
+
+    testWidgets('typing filters the places; no match says so', (tester) async {
+      await openPicker(tester, FakeLocator(const LocationProblem(LocationIssue.denied)));
+      await tester.tap(find.byType(TextField).first);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'pog');
+      await tester.pumpAndSettle();
+      expect(find.text('Masjid Pogung Raya'), findsOneWidget);
+      expect(find.text('Gerbang Fakultas Teknik UGM'), findsNothing);
+      expect(find.text('Rekomendasi'), findsNothing, reason: 'typed text shows one list');
+
+      await tester.enterText(find.byType(TextField).first, 'zzz');
+      await tester.pumpAndSettle();
+      expect(find.text('Tidak ada tempat yang cocok'), findsOneWidget);
+    });
+
     testWidgets('without GPS it stays on the demo point quietly; "Ke lokasi saya" reports the problem', (tester) async {
       final locator = FakeLocator(const LocationProblem(LocationIssue.denied));
       await openPicker(tester, locator);

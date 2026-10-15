@@ -50,6 +50,7 @@ class PaymentResultScreen extends ConsumerWidget {
       );
     }
     final paidAt = r.pickup.paidAt;
+    final delivered = r.delivery != null;
     // Back from the success screen goes to the chat, not to the payment form of an order that is already paid.
     return PopScope(
       canPop: false,
@@ -61,14 +62,17 @@ class PaymentResultScreen extends ConsumerWidget {
       title: 'Pembayaran berhasil',
       body: '${formatRupiah(r.payable)} · QRIS${r.discount > 0 ? ' · voucher −${formatRupiah(r.discount)}' : ''}${paidAt == null ? '' : ' · ${formatTime(paidAt)}'}',
       content: [
-        ListingSummaryCard(listing: r.listing, subtitle: '${r.provider.name} · ${r.portions} porsi · ambil s/d $deadline'),
+        ListingSummaryCard(listing: r.listing, subtitle: '${r.provider.name} · ${r.portions} porsi · ${delivered ? 'diantar' : 'ambil'} s/d $deadline'),
         InfoBox('Dana ditahan PawonFood dan diteruskan ke ${r.provider.name} setelah kamu memindai QR ambil. Kalau reservasi kedaluwarsa, dana kembali penuh.'),
-        Pill('Ambil sebelum $deadline', color: AppColors.accentInk, height: 34, size: 14, weight: 700, hPad: 16),
+        Pill('${delivered ? 'Diantar' : 'Ambil'} sebelum $deadline', color: AppColors.accentInk, height: 34, size: 14, weight: 700, hPad: 16),
       ],
-      actions: [
-        AppButton(label: 'Lihat rute', icon: LucideIcons.personStanding, onPressed: () => context.pushReplacement('/route/$conversationId')),
-        AppButton(label: 'Kembali ke chat', variant: AppButtonVariant.outline, onPressed: toChat),
-      ],
+      // A delivery comes to the receiver, so there is no walking route to open.
+      actions: delivered
+          ? [AppButton(label: 'Kembali ke chat', onPressed: toChat)]
+          : [
+              AppButton(label: 'Lihat rute', icon: LucideIcons.personStanding, onPressed: () => context.pushReplacement('/route/$conversationId')),
+              AppButton(label: 'Kembali ke chat', variant: AppButtonVariant.outline, onPressed: toChat),
+            ],
     ),
     );
   }

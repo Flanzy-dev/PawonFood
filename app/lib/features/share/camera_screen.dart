@@ -228,6 +228,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         ValidationFailure.rateLimited => 'Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.',
         ValidationFailure.uploadRejected => 'Foto ini tidak bisa diperiksa. Coba foto ulang.',
         ValidationFailure.timeout => 'Pemeriksaan terlalu lama. Periksa koneksi internet, lalu coba lagi.',
+        ValidationFailure.serverError => 'Pemeriksaan foto sedang bermasalah. Coba lagi sebentar lagi.',
         _ => 'Foto belum bisa diperiksa. Periksa koneksi internet, lalu coba lagi.',
       };
 

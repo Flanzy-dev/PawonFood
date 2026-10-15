@@ -78,9 +78,9 @@ class _ProviderQrScreenState extends ConsumerState<ProviderQrScreen> {
   Widget build(BuildContext context) {
     final r = ref.watch(reservationProvider(_id));
     if (r == null) return const NotFoundScaffold();
-    final who = r.receiver.name.split(' ').first;
+    final who = firstName(r.receiver.name);
     final deadline = formatTime(r.pickup.deadline);
-    final payPill = r.amount == 0
+    final payPill = r.total == 0
         ? 'Gratis, tanpa bayar'
         : r.pickup.paid
             ? 'Sudah dibayar via QRIS'
@@ -124,7 +124,7 @@ class _ProviderQrScreenState extends ConsumerState<ProviderQrScreen> {
                             builder: (_, left) => Text('Berlaku s/d $deadline · sisa ${formatMinutesLeft(left)}', style: AppTypography.display(17, weight: 700, height: 22)),
                           ),
                           const SizedBox(height: 4),
-                          Text('Tunjukkan ke $who saat mengambil.', style: AppTypography.text(14, color: AppColors.inkMuted)),
+                          Text(r.delivery == null ? 'Tunjukkan ke $who saat mengambil.' : 'Antar ke ${r.delivery!.address}, lalu tunjukkan ke $who.', style: AppTypography.text(14, color: AppColors.inkMuted)),
                         ]),
                       ),
                     ),
@@ -161,7 +161,7 @@ class ProviderPickupDoneScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final r = ref.watch(reservationProvider(conversationId));
     if (r == null) return const NotFoundScaffold();
-    final who = r.receiver.name.split(' ').first;
+    final who = firstName(r.receiver.name);
     final points = pickupPoints(portions: r.portions, isFree: r.amount == 0);
     final paidInApp = r.pickup.paid || r.pickup.payMethod == PayMethod.qris;
     return StatusLayout(
@@ -189,10 +189,10 @@ class ProviderPickupDoneScreen extends ConsumerWidget {
               AmountRow('Dibayar $who via QRIS', formatRupiah(r.payable)),
               if (r.discount > 0) AmountRow('Voucher PawonFood (ditanggung PawonFood)', formatRupiah(r.discount)),
               const Divider(height: 16),
-              AmountRow('Masuk ke saldo kamu', formatRupiah(r.amount), strong: true),
+              AmountRow('Masuk ke saldo kamu', formatRupiah(r.total), strong: true),
             ]),
           )
-        else if (r.amount > 0)
+        else if (r.total > 0)
           Pill('Terima ${formatRupiah(r.payable)} di tempat', color: AppColors.accentInk, height: 36, size: 15, weight: 700, hPad: 18),
         if (paidInApp) Text('Pencairan saldo ke rekening: segera hadir.', style: AppTypography.text(13, color: AppColors.inkMuted)),
       ],

@@ -17,6 +17,9 @@ void main() {
   Future<void> openDetail(WidgetTester tester, String name) async {
     final list = find.descendant(of: find.byType(ListView).first, matching: find.byType(Scrollable)).first;
     await tester.scrollUntilVisible(find.text(name), 200, scrollable: list);
+    // Bring the card to the top: at the bottom edge it can sit under the tab bar and the tap lands there.
+    await tester.ensureVisible(find.text(name));
+    await tester.pumpAndSettle();
     await tester.tap(find.text(name));
     await tester.pumpAndSettle();
   }

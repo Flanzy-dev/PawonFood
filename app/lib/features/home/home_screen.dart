@@ -22,6 +22,7 @@ import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/option_row.dart';
 import '../../core/widgets/pawon_map.dart';
 import '../../core/widgets/pills.dart';
+import 'search_screen.dart';
 
 /// B5 Beranda (and the empty state B6): location, headline, search, filters, 1 km mini-map and the feed.
 class HomeScreen extends ConsumerWidget {
@@ -83,7 +84,14 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Text('Lapar? Masih ada yang hangat di dekatmu.', style: AppTypography.titleXl),
           const SizedBox(height: 16),
-          SearchField(hint: 'Cari lauk, nasi, roti...', value: query, onChanged: (v) => ref.read(searchQueryProvider.notifier).state = v),
+          SearchField(
+            hint: 'Cari lauk, nasi, roti...',
+            value: query,
+            readOnly: true,
+            heroTag: searchHeroTag,
+            onTap: () => context.push('/search'),
+            onChanged: (v) => ref.read(searchQueryProvider.notifier).state = v,
+          ),
           const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -162,16 +170,8 @@ class HomeScreen extends ConsumerWidget {
               child: EmptyState(
                 icon: LucideIcons.searchX,
                 title: query.trim().isNotEmpty ? 'Tidak ada hasil untuk "${query.trim()}"' : 'Belum ada ${category!.label.toLowerCase()} di sekitarmu',
+                // No button: the ✕ in the search field clears the search, the "All" chip clears the category.
                 body: 'Coba kata kunci atau kategori lain.',
-                actions: [
-                  AppButton(
-                    label: 'Hapus filter',
-                    onPressed: () {
-                      ref.read(searchQueryProvider.notifier).state = '';
-                      ref.read(categoryFilterProvider.notifier).state = null;
-                    },
-                  ),
-                ],
               ),
             )
           else if (feed.isEmpty)
@@ -188,7 +188,7 @@ class HomeScreen extends ConsumerWidget {
               ),
             )
           else ...[
-            SectionTitle('Segera habis di sekitarmu', actionLabel: 'Semua', onAction: () => context.push('/semua')),
+            SectionTitle('Pilihan untukmu di sekitar',actionLabel: 'Semua', onAction: () => context.push('/semua')),
             const SizedBox(height: 8),
             for (final (i, item) in feed.indexed)
               FadeSlideIn(

@@ -1,3 +1,5 @@
+import 'package:latlong2/latlong.dart';
+
 import 'enums.dart';
 
 class Message {
@@ -13,8 +15,17 @@ class Message {
   final int? amount;
 }
 
+/// "Minta diantar": where the provider brings the food, and the fee they set on the listing (all of it goes to them).
+class Delivery {
+  const Delivery({required this.address, required this.position, required this.fee});
+
+  final String address;
+  final LatLng position;
+  final int fee;
+}
+
 class Offer {
-  const Offer({required this.id, required this.listingId, required this.receiverId, required this.amount, this.portions = 1, this.status = OfferStatus.pending});
+  const Offer({required this.id, required this.listingId, required this.receiverId, required this.amount, this.portions = 1, this.status = OfferStatus.pending, this.delivery});
 
   final String id;
   final String listingId;
@@ -23,8 +34,15 @@ class Offer {
   final int portions;
   final OfferStatus status;
 
-  Offer copyWith({OfferStatus? status, int? amount}) =>
-      Offer(id: id, listingId: listingId, receiverId: receiverId, amount: amount ?? this.amount, portions: portions, status: status ?? this.status);
+  /// Null for "Ambil sendiri". Picked on the detail screen before the offer or "Ambil", and fixed once reserved.
+  final Delivery? delivery;
+
+  /// What the food comes to: [amount] is per porsi. The delivery fee is on top ([deliveryFee]).
+  int get total => amount * portions;
+  int get deliveryFee => delivery?.fee ?? 0;
+
+  Offer copyWith({OfferStatus? status, int? amount}) => Offer(
+      id: id, listingId: listingId, receiverId: receiverId, amount: amount ?? this.amount, portions: portions, status: status ?? this.status, delivery: delivery);
 }
 
 /// The reservation behind an accepted offer or an "Ambil". There is no code to read out: the provider shows a QR
@@ -40,12 +58,17 @@ class Pickup {
     this.statusChecks = 0,
     this.voucherCode,
     this.discount = 0,
+    this.held = 0,
   });
 
   final String id;
   final DateTime deadline;
   final PickupStatus status;
   final DateTime? pickedUpAt;
+
+  /// Portions taken out of the listing's "Sisa N porsi" while this reservation is open. They come back when it expires;
+  /// 0 for reservations that never held stock (seeded demo threads).
+  final int held;
 
   /// Null until the receiver picks how to pay (always null for free food).
   final PayMethod? payMethod;
@@ -67,7 +90,7 @@ class Pickup {
   /// What the provider's QR encodes. One reservation, one scan.
   String get qrPayload => 'pawonfood://ambil/$id';
 
-  Pickup copyWith({PickupStatus? status, DateTime? pickedUpAt, PayMethod? payMethod, DateTime? paidAt, int? statusChecks, int? discount}) => Pickup(
+  Pickup copyWith({PickupStatus? status, DateTime? pickedUpAt, PayMethod? payMethod, DateTime? paidAt, int? statusChecks, int? discount, int? held}) => Pickup(
         id: id,
         deadline: deadline,
         status: status ?? this.status,
@@ -77,6 +100,7 @@ class Pickup {
         statusChecks: statusChecks ?? this.statusChecks,
         voucherCode: voucherCode,
         discount: discount ?? this.discount,
+        held: held ?? this.held,
       );
 
   /// Same reservation with a voucher applied, or with it removed ([code] null).
@@ -90,6 +114,7 @@ class Pickup {
         statusChecks: statusChecks,
         voucherCode: code,
         discount: discount,
+        held: held,
       );
 }
 
@@ -107,6 +132,7 @@ enum ThreadStatus {
   waiting('Menunggu balasan'),
   accepted('Tawaran diterima'),
   ready('Siap diambil'),
+  delivering('Siap diantar'),
   done('Selesai'),
   expired('Kedaluwarsa'),
   soldOut('Habis');
@@ -156,6 +182,8 @@ class Conversation {
     if (pickup?.status == PickupStatus.pickedUp) return ThreadStatus.done;
     if (pickup?.status == PickupStatus.expired) return ThreadStatus.expired;
     if (closedSoldOut && pickup == null) return ThreadStatus.soldOut;
+    // A delivery says so whatever the price: both sides need to know the food travels.
+    if (pickup != null && offer?.delivery != null) return ThreadStatus.delivering;
     if (offer?.status == OfferStatus.accepted && (offer!.amount > 0)) return ThreadStatus.accepted;
     if (pickup != null) return ThreadStatus.ready;
     return ThreadStatus.waiting;

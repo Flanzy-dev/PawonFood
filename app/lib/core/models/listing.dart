@@ -2,6 +2,7 @@ import 'package:latlong2/latlong.dart';
 
 import 'enums.dart';
 import 'person.dart';
+import 'recipe.dart';
 
 class Listing {
   const Listing({
@@ -26,6 +27,11 @@ class Listing {
     this.localPhotoPath,
     this.description,
     this.bestBefore,
+    this.healthTags = const {},
+    this.recipe,
+    this.fypItem,
+    this.deliveryFee,
+    this.allowsPickup = true,
   });
 
   final String id;
@@ -60,7 +66,27 @@ class Listing {
   /// "Baik digunakan sebelum" for sealed food (C15c).
   final DateTime? bestBefore;
 
+  /// "Pilihan sehat" tags set by the provider (pre-filled by the AI).
+  final Set<HealthTag> healthTags;
+
+  /// Recipe idea the provider attached when sharing fresh ingredients.
+  final Recipe? recipe;
+
+  /// This listing's item id in the FYP recommender (ml/fyp), e.g. "i106". Demo mapping in the mock data; null for
+  /// listings published in the app, which the model has never seen.
+  final String? fypItem;
+
+  /// "Bisa diantar": the fee the provider set (Rp0, Rp2.000 or Rp3.000, all of it theirs). Null when the food is pickup only.
+  final int? deliveryFee;
+
+  /// "Ambil di tempat": the receiver may come to the pickup point. False for delivery-only food, which then always has a
+  /// [deliveryFee].
+  final bool allowsPickup;
+
   bool get isFree => price == 0;
+
+  /// The receiver can pick "Minta diantar" (PRD Handover methods).
+  bool get canDeliver => deliveryFee != null;
 
   /// The provider changed the category the AI filled in.
   bool get categoryCorrected => aiCategory != null && aiCategory != category;
@@ -92,10 +118,15 @@ class Listing {
         isOwn: isOwn,
         description: description,
         bestBefore: bestBefore,
+        healthTags: healthTags,
+        recipe: recipe,
+        fypItem: fypItem,
+        deliveryFee: deliveryFee,
+        allowsPickup: allowsPickup,
       );
 
   /// Builds a listing from mock JSON. Times are relative to [now] so the data never goes stale.
-  factory Listing.fromJson(Map<String, dynamic> j, Person provider, DateTime now, {String? ownerId}) => Listing(
+  factory Listing.fromJson(Map<String, dynamic> j, Person provider, DateTime now, {String? ownerId, Recipe? recipe}) => Listing(
         id: j['id'] as String,
         provider: provider,
         photo: j['photo'] as String,
@@ -114,5 +145,10 @@ class Listing {
         isOwn: provider.id == ownerId,
         description: j['description'] as String?,
         bestBefore: j['bestBeforeInDays'] == null ? null : now.add(Duration(days: (j['bestBeforeInDays'] as num).toInt())),
+        healthTags: HealthTag.parseList(j['healthTags']),
+        recipe: recipe,
+        fypItem: j['fypItem'] as String?,
+        deliveryFee: (j['deliveryFee'] as num?)?.toInt(),
+        allowsPickup: (j['pickup'] ?? true) as bool,
       );
 }

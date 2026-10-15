@@ -68,12 +68,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final rows = <Widget>[
       ListingSummaryCard(
         listing: r.listing,
-        subtitle: '${r.provider.name} · ${r.portions} porsi · ambil s/d ${formatTime(r.pickup.deadline)}',
+        subtitle: '${r.provider.name} · ${r.portions} porsi · ${r.delivery == null ? 'ambil' : 'diantar'} s/d ${formatTime(r.pickup.deadline)}',
       ),
       const SizedBox(height: 16),
       Text('Rincian', style: AppTypography.titleM),
       const SizedBox(height: 6),
       AmountRow('Harga disepakati', formatRupiah(r.amount)),
+      // The delivery fee goes entirely to the provider, like the food price.
+      if (r.delivery != null) AmountRow('Ongkir', r.deliveryFee == 0 ? 'Gratis' : formatRupiah(r.deliveryFee)),
       if (code != null) AppliedVoucherRow(code: code, discount: r.discount),
       const AmountRow('Biaya layanan', 'Gratis'),
       const Divider(height: 20),
@@ -107,7 +109,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       const SizedBox(height: 10),
       OptionRow(
         title: 'Tunai di tempat',
-        subtitle: 'Bayar saat ambil, setelah pindai QR',
+        subtitle: r.delivery == null ? 'Bayar saat ambil, setelah pindai QR' : 'Bayar saat makanan sampai, setelah pindai QR',
         selected: _method == PayMethod.cash,
         onTap: () => setState(() => _method = PayMethod.cash),
       ),
@@ -123,7 +125,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         child: InfoBox(
           key: ValueKey(_method),
           _method == PayMethod.cash
-              ? 'Jangan transfer langsung ke penyedia. Pembayaran hanya lewat aplikasi.'
+              ? 'Bayar tunai ke penyedia setelah memindai QR. Jangan transfer uang di luar aplikasi.'
               : 'Dana ditahan PawonFood sampai QR ambil dipindai. Kalau batal atau kedaluwarsa, dana kembali penuh.',
         ),
       ),

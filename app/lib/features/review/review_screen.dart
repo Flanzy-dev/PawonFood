@@ -62,7 +62,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final listing = conv == null ? null : ref.watch(listingByIdProvider(conv.listingId));
     if (conv == null || listing == null) return const NotFoundScaffold(title: 'Pesanan tidak ditemukan');
     final now = ref.watch(clockProvider)();
-    final amount = conv.offer?.amount ?? listing.price;
+    final amount = conv.offer?.total ?? listing.price;
 
     return Scaffold(
       body: SafeArea(

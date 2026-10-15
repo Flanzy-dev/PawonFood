@@ -22,6 +22,27 @@ enum FoodCategory {
   static FoodCategory fromKey(String key) => values.firstWhere((c) => c.key == key, orElse: () => makananMatang);
 }
 
+/// What a dish contains or how it was cooked, tagged by the provider (the AI pre-fills what it can see).
+/// Describes composition only: never a health or safety claim.
+enum HealthTag {
+  sayurBuah('sayur_buah', 'Sayur/buah'),
+  protein('protein', 'Protein'),
+  tidakDigoreng('tidak_digoreng', 'Tidak digoreng'),
+  rendahGula('rendah_gula', 'Rendah gula');
+
+  const HealthTag(this.key, this.label);
+  final String key;
+  final String label;
+
+  static HealthTag? tryKey(Object? key) => values.where((t) => t.key == key).firstOrNull;
+
+  /// Reads a JSON list of keys; unknown keys are skipped.
+  static Set<HealthTag> parseList(Object? keys) => {
+        if (keys is List)
+          for (final k in keys) ?tryKey(k),
+      };
+}
+
 enum Tier {
   // Display names follow the lo-fi D17 (user's choice, 2026-10-08); the keys stay as in the mock data.
   sobatPawon('Pawon Friend', 0),

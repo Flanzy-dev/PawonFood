@@ -15,6 +15,7 @@ import 'features/chat/chat_screen.dart';
 import 'features/chat/messages_screen.dart';
 import 'features/home/all_food_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/home/search_screen.dart';
 import 'features/listing/listing_detail_screen.dart';
 import 'features/map/map_screen.dart';
 import 'features/payment/payment_result_screen.dart';
@@ -88,6 +89,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(parentNavigatorKey: _rootKey, path: '/semua', pageBuilder: (_, s) => motionPage(s, const AllFoodScreen())),
+      GoRoute(parentNavigatorKey: _rootKey, path: '/search', pageBuilder: (_, s) => motionPage(s, const SearchScreen(), motion: PageMotion.fade)),
       GoRoute(parentNavigatorKey: _rootKey, path: '/rewards', pageBuilder: (_, s) => motionPage(s, const RewardsScreen())),
       // '/reward/claimed' must stay before '/reward/:id'
       GoRoute(parentNavigatorKey: _rootKey, path: '/reward/claimed', pageBuilder: (_, s) => motionPage(s, const VoucherClaimedScreen(), motion: PageMotion.fade)),

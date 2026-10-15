@@ -13,6 +13,7 @@ import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/food_card.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
+import '../../core/widgets/option_row.dart';
 
 /// B5b "Semua makanan": the full list behind "Semua" on Beranda, with the same filters and a sort option.
 class AllFoodScreen extends ConsumerWidget {
@@ -112,35 +113,28 @@ class AllFoodScreen extends ConsumerWidget {
     );
   }
 
+  /// "Urutkan" (B5e): radio rows like the other pickers, with a hint under the ranking option.
   void _pickSort(BuildContext context, WidgetRef ref) {
     final current = ref.read(feedSortProvider);
     showAppSheet<void>(
       context: context,
-      useRootNavigator: true,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Urutkan', style: AppTypography.titleL),
-              const SizedBox(height: 8),
-              for (final s in FeedSort.values)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  minTileHeight: 56,
-                  title: Text(s.label, style: AppTypography.text(16, weight: s == current ? 700 : 500)),
-                  trailing: s == current ? const Icon(LucideIcons.check, color: AppColors.primary) : null,
-                  onTap: () {
-                    ref.read(feedSortProvider.notifier).state = s;
-                    Navigator.of(ctx).pop();
-                  },
-                ),
-            ],
-          ),
-        ),
+      builder: (ctx) => SheetBody(
+        title: 'Urutkan',
+        children: [
+          for (final s in FeedSort.values)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OptionRow(
+                title: s.label,
+                subtitle: s.hint,
+                selected: s == current,
+                onTap: () {
+                  ref.read(feedSortProvider.notifier).state = s;
+                  closeSheet(ctx);
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

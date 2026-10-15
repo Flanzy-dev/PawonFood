@@ -3,6 +3,7 @@
 // and a short detail for the log.
 
 import { buildMessages } from './prompt.js';
+import { FAKE_RECIPES } from './recipes.js';
 
 export class ProviderError extends Error {
   /** @param {'model_timeout'|'model_unavailable'|'model_bad_response'} code */
@@ -35,54 +36,62 @@ function contentText(data) {
 export function createQwenProvider({ apiKey, baseUrl, model, timeoutMs, reasoningEffort = '', fetchImpl = globalThis.fetch }) {
   const redact = (s) => (apiKey ? String(s).split(apiKey).join('[redacted]') : String(s));
 
+  /** Sends chat messages to the model and returns its raw text answer. Throws ProviderError. */
+  async function complete(messages, { maxTokens = 800, temperature = 0 } = {}) {
+    const body = {
+      model,
+      temperature,
+      max_tokens: maxTokens,
+      messages,
+      ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+    };
+    let res;
+    try {
+      res = await fetchImpl(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') throw new ProviderError('model_timeout', `no answer within ${timeoutMs} ms`);
+      throw new ProviderError('model_unavailable', redact(`network error: ${e?.cause?.code ?? e?.name ?? 'unknown'}`));
+    }
+    if (!res.ok) {
+      throw new ProviderError('model_unavailable', redact(`upstream ${res.status}: ${await readSnippet(res)}`));
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') throw new ProviderError('model_timeout', `no answer within ${timeoutMs} ms`);
+      throw new ProviderError('model_bad_response', 'upstream body is not JSON');
+    }
+    const text = contentText(data);
+    if (text === null) throw new ProviderError('model_bad_response', 'upstream answer has no text content');
+    return text;
+  }
+
   return {
     name: 'qwen',
     model,
+    complete,
     /** Sends the photo to the model and returns its raw text answer. Throws ProviderError. */
-    async describe({ buffer, type }) {
-      const body = {
-        model,
-        temperature: 0,
-        max_tokens: 800,
-        messages: buildMessages(`data:${type};base64,${buffer.toString('base64')}`),
-        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-      };
-      let res;
-      try {
-        res = await fetchImpl(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(timeoutMs),
-        });
-      } catch (e) {
-        if (e?.name === 'TimeoutError' || e?.name === 'AbortError') throw new ProviderError('model_timeout', `no answer within ${timeoutMs} ms`);
-        throw new ProviderError('model_unavailable', redact(`network error: ${e?.cause?.code ?? e?.name ?? 'unknown'}`));
-      }
-      if (!res.ok) {
-        throw new ProviderError('model_unavailable', redact(`upstream ${res.status}: ${await readSnippet(res)}`));
-      }
-      let data;
-      try {
-        data = await res.json();
-      } catch (e) {
-        if (e?.name === 'TimeoutError' || e?.name === 'AbortError') throw new ProviderError('model_timeout', `no answer within ${timeoutMs} ms`);
-        throw new ProviderError('model_bad_response', 'upstream body is not JSON');
-      }
-      const text = contentText(data);
-      if (text === null) throw new ProviderError('model_bad_response', 'upstream answer has no text content');
-      return text;
-    },
+    describe: ({ buffer, type }) => complete(buildMessages(`data:${type};base64,${buffer.toString('base64')}`)),
   };
 }
 
-/** Local development without a key: every photo is described as cooked food in good condition. */
-export function createFakeProvider(answer = FAKE_ANSWER) {
+/** Local development without a key: every photo is described as cooked food in good condition, and every recipe
+ * request gets the same fixed idea. */
+export function createFakeProvider(answer = FAKE_ANSWER, recipes = FAKE_RECIPES) {
   return {
     name: 'fake',
     model: 'fake',
     async describe() {
       return typeof answer === 'function' ? answer() : answer;
+    },
+    async complete() {
+      return recipes;
     },
   };
 }
@@ -95,4 +104,5 @@ export const FAKE_ANSWER = JSON.stringify({
   visible_signs: [],
   image_quality: 'good',
   warnings: [],
+  health_signals: ['protein', 'digoreng'],
 });

@@ -85,6 +85,9 @@ class StepProgress extends StatelessWidget {
 const double navBarHeight = 68;
 const double _fabRise = 30;
 
+/// How far the raised Bagikan button sticks out above the bar (floating map cards stay clear of it).
+const double navFabRise = _fabRise;
+
 /// Bottom space a tab screen should leave so content is not hidden behind the nav bar.
 double navContentInset(BuildContext context) => navBarHeight + MediaQuery.paddingOf(context).bottom + 16;
 

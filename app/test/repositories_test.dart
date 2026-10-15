@@ -6,6 +6,8 @@ import 'package:pawonfood/core/data/providers.dart';
 import 'package:pawonfood/core/data/session_repository.dart';
 import 'package:pawonfood/core/models/conversation.dart';
 import 'package:pawonfood/core/models/enums.dart';
+import 'package:pawonfood/core/models/recipe.dart';
+import 'package:pawonfood/core/services/food_score.dart';
 import 'package:pawonfood/core/services/geo.dart';
 
 import 'support.dart';
@@ -31,10 +33,13 @@ void main() {
   });
 
   group('feed', () {
-    test('Pogung shows the most urgent listing first and hides sold-out ones', () {
+    test('Pogung ranks by score (urgent, fresh, healthy, near) and hides sold-out ones', () {
       final c = signedIn();
       final feed = c.read(feedProvider);
-      expect(feed.first.listing.id, 'l_ayam');
+      for (var i = 1; i < feed.length; i++) {
+        expect(feed[i].score, lessThanOrEqualTo(feed[i - 1].score));
+      }
+      expect(isHealthy(feed.first.listing), isTrue, reason: 'the top of the feed is healthy surplus');
       expect(feed.any((i) => i.listing.isSoldOut), isFalse);
       expect(feed.every((i) => i.distance <= 1000), isTrue);
     });
@@ -71,11 +76,12 @@ void main() {
       expect(byId['c2'], ThreadStatus.ready);
       expect(byId['c3'], ThreadStatus.soldOut);
       expect(byId['c4'], ThreadStatus.waiting);
+      expect(byId['c5'], ThreadStatus.delivering);
       expect(c.read(receivedThreadsProvider).length, 3);
-      expect(c.read(sharedThreadsProvider).length, 1);
+      expect(c.read(sharedThreadsProvider).length, 2);
     });
 
-    test('claim reserves until the deadline; the QR scan consumes a portion and counts impact', () async {
+    test('claim reserves until the deadline and holds its portion; the QR scan counts impact', () async {
       final c = signedIn();
       final chat = c.read(chatProvider.notifier);
       final id = chat.claim('l_ayam2');
@@ -85,7 +91,8 @@ void main() {
       expect(conv.pickup!.status, PickupStatus.reserved);
       expect(conv.pickup!.deadline, c.read(listingByIdProvider('l_ayam2'))!.pickupBy);
       expect(conv.pickup!.qrPayload, 'pawonfood://ambil/${conv.pickup!.id}');
-      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 3);
+      expect(conv.pickup!.held, 1);
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 2, reason: 'the reserved portion leaves "Sisa N porsi" right away');
 
       expect(chat.scanQr(id), ScanOutcome.ok);
       expect(chat.scanQr(id), ScanOutcome.alreadyUsed);
@@ -103,8 +110,70 @@ void main() {
       listings.consume('l_ayam', 1);
       final id = chat.claim('l_ayam');
       chat.scanQr(id);
-      expect(c.read(listingByIdProvider('l_ayam'))!.status, ListingStatus.habis);
+      expect(c.read(listingByIdProvider('l_ayam'))!.isSoldOut, isTrue);
       expect(c.read(feedProvider).any((i) => i.listing.id == 'l_ayam'), isFalse);
+    });
+
+    test('the last portion can only be reserved once, and a reservation that expires gives it back', () async {
+      var now = fixedNow;
+      final c = ProviderContainer(overrides: [...testOverrides(), clockProvider.overrideWithValue(() => now)]);
+      addTearDown(c.dispose);
+      c.read(sessionProvider.notifier).login('rafi@email.com');
+      final chat = c.read(chatProvider.notifier);
+      final listings = c.read(listingsProvider.notifier);
+      listings.consume('l_ayam2', 2); // one portion left
+
+      final id = chat.claim('l_ayam2');
+      expect(c.read(conversationProvider(id))!.pickup, isNotNull);
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 0);
+      expect(listings.hold('l_ayam2', 1), isFalse, reason: 'nothing left to reserve for anyone else');
+
+      now = c.read(listingByIdProvider('l_ayam2'))!.pickupBy.add(const Duration(minutes: 1));
+      expect(chat.expireIfLate(id), isTrue);
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 1, reason: 'the expired reservation reopens its portion');
+      expect(chat.expireIfLate(id), isTrue);
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 1, reason: 'and only once');
+      await pumpEventQueue();
+    });
+
+    test('taking food that was reserved by someone else meanwhile reserves nothing', () {
+      final c = signedIn();
+      final chat = c.read(chatProvider.notifier);
+      c.read(listingsProvider.notifier).hold('l_ayam2', 3); // somebody else took all three
+      final id = chat.claim('l_ayam2');
+      final conv = c.read(conversationProvider(id))!;
+      expect(conv.pickup, isNull);
+      expect(conv.status, ThreadStatus.soldOut);
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 0);
+    });
+
+    test('an offer whose portions went elsewhere while it waited is refused, not reserved', () async {
+      final c = signedIn();
+      final chat = c.read(chatProvider.notifier);
+      final id = chat.openForListing('l_ayam2'); // 3 porsi
+      expect(chat.sendOffer(id, 4500, portions: 2), isNull);
+      c.read(listingsProvider.notifier).hold('l_ayam2', 2); // one is left when the provider answers
+      await pumpEventQueue();
+      final conv = c.read(conversationProvider(id))!;
+      expect(conv.offer!.status, OfferStatus.rejected);
+      expect(conv.pickup, isNull);
+      expect(conv.messages.last.body, 'Maaf, porsinya sudah habis.');
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 1);
+    });
+
+    test('an accepted offer for 2 portions holds 2 and is paid per portion times 2', () async {
+      final c = signedIn();
+      final chat = c.read(chatProvider.notifier);
+      final id = chat.openForListing('l_ayam2');
+      expect(chat.sendOffer(id, 4500, portions: 2), isNull);
+      await pumpEventQueue();
+      final conv = c.read(conversationProvider(id))!;
+      expect(conv.pickup!.held, 2);
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 1);
+      expect(chat.amountOf(conv), 9000);
+      final r = c.read(reservationProvider(id))!;
+      expect(r.amount, 9000);
+      expect(r.payable, 9000);
     });
 
     test('an offer of at least half the price is accepted by the simulated provider', () async {
@@ -201,6 +270,7 @@ void main() {
       c.read(sessionProvider.notifier).login('rafi@email.com');
       final chat = c.read(chatProvider.notifier);
       final id = chat.claim('l_ayam2');
+      expect(c.read(listingByIdProvider('l_ayam2'))!.portionsLeft, 2);
       now = c.read(listingByIdProvider('l_ayam2'))!.pickupBy.add(const Duration(minutes: 1));
       expect(chat.scanQr(id), ScanOutcome.expired);
       expect(c.read(conversationProvider(id))!.status, ThreadStatus.expired);
@@ -251,6 +321,28 @@ void main() {
       expect(result.listing!.isOwn, isTrue);
       expect(c.read(listingsProvider).first.id, result.listing!.id);
       expect(c.read(feedProvider).any((i) => i.listing.id == result.listing!.id), isTrue);
+    });
+
+    test('health tags are kept, and a recipe only for fresh ingredients', () {
+      final c = signedIn();
+      const recipe = Recipe(id: 'r_x', title: 'Sup', minutes: 10, ingredients: ['air'], steps: ['masak']);
+      PublishDraft withCategory(FoodCategory category) => PublishDraft(
+            name: 'Bayam',
+            category: category,
+            portions: 1,
+            price: 0,
+            negotiable: false,
+            pickupBy: fixedNow.add(const Duration(hours: 1)),
+            pickupPoint: 'Kos Melati, Pogung',
+            healthTags: const {HealthTag.sayurBuah, HealthTag.tidakDigoreng},
+            recipe: recipe,
+          );
+      final raw = c.read(listingsProvider.notifier).publish(withCategory(FoodCategory.bahanMentah)).listing!;
+      expect(raw.healthTags, {HealthTag.sayurBuah, HealthTag.tidakDigoreng});
+      expect(raw.recipe, recipe);
+      final cooked = c.read(listingsProvider.notifier).publish(withCategory(FoodCategory.makananMatang)).listing!;
+      expect(cooked.healthTags, isNotEmpty);
+      expect(cooked.recipe, isNull, reason: 'recipes belong to fresh ingredients');
     });
 
     test('free food is allowed (price 0)', () {

@@ -16,6 +16,8 @@ Future<ProviderContainer> openPayment(WidgetTester tester) async {
   usePhoneScreen(tester);
   await signIn(tester);
   await tester.scrollUntilVisible(find.text('Ayam Goreng Lalapan'), 300, scrollable: find.byType(Scrollable).first);
+  await tester.ensureVisible(find.text('Ayam Goreng Lalapan')); // clear of the tab bar
+  await tester.pumpAndSettle();
   await tester.tap(find.text('Ayam Goreng Lalapan'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Ambil · Rp7.000'));
@@ -125,6 +127,18 @@ void main() {
     final discount = n.byId(id)!.pickup!.discount;
     expect(discount, price - ChatNotifier.minPayable, reason: 'the Rp5.000 voucher is cut so that Rp1.000 is left to pay');
     expect(price - discount, ChatNotifier.minPayable);
+  });
+
+  test('one voucher can sit on only one open reservation at a time', () async {
+    final c = makeContainer();
+    final n = c.read(chatProvider.notifier);
+    final a = n.claim('l_ayam');
+    final b = n.claim('l_ayam2');
+    expect(n.applyVoucher(a, 'PWN-V-3001'), isNull);
+    expect(n.applyVoucher(b, 'PWN-V-3001'), 'Voucher sedang dipakai di reservasi lain.');
+    n.removeVoucher(a);
+    expect(n.applyVoucher(b, 'PWN-V-3001'), isNull, reason: 'free again once the first reservation let go of it');
+    await pumpEventQueue();
   });
 
   test('formatShortDate gives a three-letter Indonesian month', () {

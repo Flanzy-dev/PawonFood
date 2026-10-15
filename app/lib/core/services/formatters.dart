@@ -9,6 +9,9 @@ String formatRupiah(int value) {
   return '${value < 0 ? '-' : ''}Rp$buf';
 }
 
+/// The delivery fee as the receiver reads it: `+Rp2.000`, or `Gratis ongkir` for Rp0.
+String formatDeliveryFee(int fee) => fee == 0 ? 'Gratis ongkir' : '+${formatRupiah(fee)}';
+
 /// `20.30` (dot separator, 24 hour).
 String formatTime(DateTime t) => '${t.hour.toString().padLeft(2, '0')}.${t.minute.toString().padLeft(2, '0')}';
 
@@ -51,6 +54,9 @@ String shortName(String name) {
   const venues = {'Warteg', 'Warung', 'Warmindo', 'Katering', 'Kos'};
   return parts.length > 1 && venues.contains(parts.first) ? parts.skip(1).join(' ') : name;
 }
+
+/// How a person is addressed in a sentence: "Dina Ayu" → "Dina", "Dito, anak kos" → "Dito".
+String firstName(String name) => name.split(RegExp(r'[ ,]')).first;
 
 /// `4,8` (comma decimal).
 String formatRating(double r) => r.toStringAsFixed(1).replaceAll('.', ',');

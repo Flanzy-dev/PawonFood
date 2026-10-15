@@ -32,11 +32,13 @@ void main() {
     expect(find.text('Lapar? Masih ada yang hangat di dekatmu.'), findsOneWidget);
     expect(find.text('Pogung, Sleman'), findsOneWidget);
     expect(find.text('150 Poin'), findsOneWidget);
-    expect(find.text('Segera habis di sekitarmu'), findsOneWidget);
+    expect(find.text('Pilihan untukmu di sekitar'), findsOneWidget);
 
     // B8 Detail
     final list = find.descendant(of: find.byType(ListView).first, matching: find.byType(Scrollable)).first;
     await tester.scrollUntilVisible(find.text('Ayam Goreng Lalapan'), 200, scrollable: list);
+    await tester.ensureVisible(find.text('Ayam Goreng Lalapan')); // clear of the tab bar
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ayam Goreng Lalapan'));
     await tester.pumpAndSettle();
     expect(find.text('Tawar cepat'), findsOneWidget);
@@ -133,13 +135,13 @@ void main() {
     await tester.tap(find.text('Semua'));
     await tester.pumpAndSettle();
     expect(find.textContaining('makanan dalam 1 km'), findsOneWidget);
-    expect(find.text('Terdekat'), findsOneWidget);
-    await tester.tap(find.text('Terdekat'));
+    expect(find.text('Rekomendasi'), findsOneWidget);
+    await tester.tap(find.text('Rekomendasi'));
     await tester.pumpAndSettle();
     expect(find.text('Urutkan'), findsOneWidget);
     await tester.tap(find.text('Segera habis'));
     await tester.pumpAndSettle();
-    expect(find.text('Terdekat'), findsNothing);
+    expect(find.text('Rekomendasi'), findsNothing);
     expect(find.text('Segera habis'), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Kembali'));
     await tester.pumpAndSettle();

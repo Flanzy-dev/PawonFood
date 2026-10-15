@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../services/geo.dart';
+import 'onboarding_repository.dart';
 
 /// A place where receivers collect food. The user keeps a few saved ones (D18c); a listing can also use a point
 /// picked on the map just for that listing (C15d).
@@ -64,3 +68,56 @@ class PickupPointsNotifier extends Notifier<List<PickupPoint>> {
 }
 
 final pickupPointsProvider = NotifierProvider<PickupPointsNotifier, List<PickupPoint>>(PickupPointsNotifier.new);
+
+/// "Riwayat" in the C15d search: places picked from the search or confirmed on the map, newest first. Kept on the
+/// device (memory only in tests, where there are no preferences).
+class RecentPlacesNotifier extends Notifier<List<PickupPoint>> {
+  static const _key = 'recent_places';
+  static const max = 5;
+
+  @override
+  List<PickupPoint> build() {
+    final raw = ref.read(preferencesProvider)?.getString(_key);
+    if (raw == null) return const [];
+    try {
+      return [
+        for (final e in jsonDecode(raw) as List)
+          PickupPoint(
+            id: 'recent_${e['lat']}_${e['lng']}',
+            name: e['name'] as String,
+            address: e['address'] as String,
+            position: LatLng((e['lat'] as num).toDouble(), (e['lng'] as num).toDouble()),
+          ),
+      ];
+    } on Object {
+      return const []; // an old or broken entry is not worth a crash
+    }
+  }
+
+  /// Puts [p] on top; the same spot (within ~10 m) replaces its older entry.
+  void add(PickupPoint p) {
+    final rest = [for (final r in state) if (distanceMeters(r.position, p.position) > 10) r];
+    final entry = PickupPoint(id: 'recent_${p.position.latitude}_${p.position.longitude}', name: p.name, address: p.address, position: p.position);
+    state = [entry, ...rest].take(max).toList();
+    _persist();
+  }
+
+  /// The ✕ on one Riwayat row.
+  void remove(PickupPoint p) {
+    state = [for (final r in state) if (r.id != p.id) r];
+    _persist();
+  }
+
+  /// "Hapus semua" above Riwayat.
+  void clear() {
+    state = const [];
+    _persist();
+  }
+
+  void _persist() {
+    final json = jsonEncode([for (final r in state) {'name': r.name, 'address': r.address, 'lat': r.position.latitude, 'lng': r.position.longitude}]);
+    unawaited(ref.read(preferencesProvider)?.setString(_key, json));
+  }
+}
+
+final recentPlacesProvider = NotifierProvider<RecentPlacesNotifier, List<PickupPoint>>(RecentPlacesNotifier.new);

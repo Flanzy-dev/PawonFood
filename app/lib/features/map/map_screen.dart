@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/listings_repository.dart';
 import '../../core/data/providers.dart';
+import '../../core/data/settings_repository.dart';
 import '../../core/models/enums.dart';
 import '../../core/models/listing.dart';
 import '../../core/motion/motion.dart';
@@ -17,24 +18,30 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_chip.dart';
+import '../../core/widgets/map_cluster.dart';
 import '../../core/widgets/mini_food_card.dart';
+import 'map_pin_card.dart';
+import 'radius_indicator.dart';
 import '../../core/widgets/navigation_widgets.dart';
+import '../../core/widgets/radius_sheet.dart';
 import '../../core/widgets/pawon_map.dart';
 
 /// Listing id selected on the map (pin tap); the selected listing is listed first in the sheet.
 final mapSelectedProvider = StateProvider<String?>((ref) => null);
 
-/// Listings shown on the full map: everything within 2 km of the chosen location, filtered by the category chips
-/// (shared with Beranda, so both tabs show the same category).
+/// Listings shown on the full map: everything within the chosen radius of the chosen location (500 m, 1 km or 2 km,
+/// picked with the round radius indicator), filtered by the category chips (shared with Beranda, so both tabs show the
+/// same category).
 final mapListingsProvider = Provider<List<FeedItem>>((ref) {
   final now = ref.watch(clockProvider)();
   final here = ref.watch(locationProvider).position;
+  final radius = ref.watch(radiusMetersProvider);
   final category = ref.watch(categoryFilterProvider);
   final items = <FeedItem>[];
   for (final l in ref.watch(listingsProvider)) {
     if (!isVisibleListing(l, now)) continue;
     final d = distanceMeters(here, l.position);
-    if (d > 2000) continue;
+    if (d > radius) continue;
     if (category != null && l.category != category) continue;
     items.add(FeedItem(l, d));
   }
@@ -46,8 +53,9 @@ final mapListingsProvider = Provider<List<FeedItem>>((ref) {
 const double _collapsedPx = 148;
 const double _halfPx = 360;
 
-/// B7 Peta: price-label pins, the 1 km radius, clusters, and a draggable bottom sheet (collapsed / half / full)
-/// that lists the food cards. The header keeps the GPS button.
+/// B7 Peta: price-label pins, the radius ring, clusters, and a draggable bottom sheet (collapsed / half / full) that
+/// lists the food cards. Tapping a pin swaps the sheet for a floating product card (B12c); the round radius indicator
+/// (bottom right) opens the radius picker (B12d). The header keeps the GPS button.
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
@@ -59,7 +67,9 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
   final _controller = MapController();
   final _sheet = DraggableScrollableController();
   final _extentPx = ValueNotifier<double>(_collapsedPx);
-  ScrollController? _list;
+
+  /// Listing whose floating card is open (pin tapped); null shows the bottom sheet.
+  String? _cardId;
   Timer? _settle;
   double _minFraction = 0.2;
 
@@ -122,16 +132,39 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
     });
   }
 
+  /// Pixels the camera is shifted so the opened pin sits in the free area between the header and the floating card.
+  static const _pinShiftPx = 88.0;
+
+  /// Zoom used for a tapped pin: about 360 m across, so the street at the pickup spot is readable.
+  static const _pinZoom = 17.0;
+
   void _select(Listing l) {
     ref.read(mapSelectedProvider.notifier).state = l.id;
-    if (_list?.hasClients ?? false) _list!.jumpTo(0);
-    if (!_sheet.isAttached) return;
-    if (Motion.reduced(context)) {
-      _sheet.jumpTo(_minFraction);
-    } else {
-      _sheet.animateTo(_minFraction, duration: Motion.base, curve: Motion.enter);
-    }
+    setState(() => _cardId = l.id);
+    final dLat = _pinShiftPx * metersPerPixel(l.position.latitude, _pinZoom) / 110574;
+    _glide(LatLng(l.position.latitude - dLat, l.position.longitude), _pinZoom);
   }
+
+  /// ✕ on the card: back to the overview of the radius.
+  void _closeCard() {
+    if (_cardId == null) return;
+    setState(() => _cardId = null);
+    final center = ref.read(locationProvider).position;
+    _glide(center, zoomForSpan(center.latitude, ref.read(radiusMetersProvider) * 2, 250));
+  }
+
+  /// Tap on the bare map: the card goes away, the camera stays where the user put it.
+  void _dismissCard() {
+    if (_cardId != null) setState(() => _cardId = null);
+  }
+
+  void _pickRadius() => showRadiusSheet(
+        context,
+        title: 'Jangkauan pencarian',
+        subtitle: 'Tampilkan makanan dalam radius ini',
+        current: (ref) => ref.watch(radiusMetersProvider),
+        onPick: (ref, m) => ref.read(radiusMetersProvider.notifier).state = m,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +180,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
     final ordered = [?selected, for (final i in items) if (i != selected) i];
     final area = loc.name;
     final navInset = navBarHeight + MediaQuery.paddingOf(context).bottom;
-    final far = items.any((i) => i.distance > 1000);
+    final radius = ref.watch(radiusMetersProvider);
+    final radiusText = formatRadius(radius);
+    // The floating card replaces the sheet while a pin is open.
+    final cardItem = items.where((i) => i.listing.id == _cardId).firstOrNull;
 
     return Stack(
       children: [
@@ -162,9 +198,11 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
             controller: _controller,
             center: loc.position,
             listings: [for (final i in items) i.listing],
-            selectedId: selected?.listing.id,
+            selectedId: cardItem?.listing.id, // green only while its card is open
             onSelect: _select,
-            attributionBottom: navInset + _creditLift + 6,
+            radiusMeters: radius,
+            onTapMap: _dismissCard,
+            attributionBottom: navInset + (cardItem != null ? navFabRise + 12 + MapPinCard.height : _creditLift) + 6,
           ),
         ),
         Positioned(
@@ -179,7 +217,13 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
               _minFraction = (_collapsedPx / h).clamp(0.05, 0.5);
               final maxFraction = ((h - top) / h).clamp(_minFraction + 0.1, 0.95);
               final halfFraction = (_halfPx / h).clamp(_minFraction + 0.05, maxFraction - 0.05);
-              return DraggableScrollableSheet(
+              return IgnorePointer(
+                ignoring: cardItem != null,
+                child: AnimatedSlide(
+                duration: Motion.of(context, Motion.base),
+                curve: Motion.move,
+                offset: cardItem != null ? const Offset(0, 1) : Offset.zero,
+                child: DraggableScrollableSheet(
                 controller: _sheet,
                 initialChildSize: _minFraction,
                 minChildSize: _minFraction,
@@ -187,7 +231,6 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
                 snap: true,
                 snapSizes: [halfFraction],
                 builder: (context, scroll) {
-                  _list = scroll;
                   return DecoratedBox(
                     decoration: const BoxDecoration(
                       color: AppColors.surface,
@@ -212,22 +255,20 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
                             curve: Motion.move,
                             alignment: Alignment.topLeft,
                             child: px > _collapsedPx + 24 && ordered.isNotEmpty
-                                ? Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('${ordered.length} makanan dalam ${far ? 2 : 1} km', style: AppTypography.display(17, weight: 700, height: 22)))
+                                ? Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('${ordered.length} makanan dalam $radiusText', style: AppTypography.display(17, weight: 700, height: 22)))
                                 : const SizedBox(width: double.infinity),
                           ),
                         ),
                         if (ordered.isEmpty)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            padding: const EdgeInsets.only(top: 6, bottom: 16),
                             child: Column(children: [
-                              Text('Belum ada makanan di area ini.', textAlign: TextAlign.center, style: AppTypography.bodyMuted),
+                              Text('Belum ada makanan di radius $radiusText', textAlign: TextAlign.center, style: AppTypography.display(20, weight: 800, height: 26)),
+                              const SizedBox(height: 6),
+                              Text('Coba perluas radius, atau jadilah yang pertama berbagi di ${area.split(',').first}.', textAlign: TextAlign.center, style: AppTypography.bodyMuted),
                               if (category != null) ...[
                                 const SizedBox(height: 12),
                                 AppButton(label: 'Hapus filter', variant: AppButtonVariant.outline, onPressed: () => ref.read(categoryFilterProvider.notifier).state = null),
-                              ],
-                              if (ref.watch(radiusMetersProvider) < 2000) ...[
-                                const SizedBox(height: 12),
-                                AppButton(label: 'Perluas radius ke 2 km', onPressed: () => expandRadius(ref)),
                               ],
                             ]),
                           )
@@ -241,8 +282,50 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
                     ),
                   );
                 },
+              ),
+              ),
               );
             },
+          ),
+        ),
+        // Round radius indicator: above the sheet (following it), or above the floating card.
+        Positioned.fill(
+          child: AnimatedSwitcher(
+            duration: Motion.of(context, Motion.base),
+            child: cardItem != null
+                ? Align(
+                    key: ValueKey('card_${cardItem.listing.id}'),
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, navInset + navFabRise + 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          RadiusIndicator(meters: radius, onTap: _pickRadius),
+                          const SizedBox(height: 12),
+                          MapPinCard(listing: cardItem.listing, distance: cardItem.distance, onTap: () => context.push('/listing/${cardItem.listing.id}'), onClose: _closeCard),
+                        ],
+                      ),
+                    ),
+                  )
+                : ValueListenableBuilder<double>(
+                    key: const ValueKey('sheet'),
+                    valueListenable: _extentPx,
+                    builder: (context, px, _) {
+                      final hidden = px > _halfPx + 24; // full list: the sheet covers the corner
+                      return Stack(children: [
+                        Positioned(
+                          right: 16,
+                          bottom: navInset + px.clamp(_collapsedPx, _halfPx) + 12,
+                          child: IgnorePointer(
+                            ignoring: hidden,
+                            child: AnimatedOpacity(opacity: hidden ? 0 : 1, duration: Motion.of(context, Motion.fast), child: RadiusIndicator(meters: radius, onTap: _pickRadius)),
+                          ),
+                        ),
+                      ]);
+                    },
+                  ),
           ),
         ),
         SafeArea(
@@ -261,7 +344,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Radius ${far ? 2 : 1} km dari', style: AppTypography.text(13, color: AppColors.inkMuted)),
+                            Text('Radius $radiusText dari', style: AppTypography.text(13, color: AppColors.inkMuted)),
                             Text(area, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.display(20, height: 26)),
                           ],
                         ),

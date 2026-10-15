@@ -10,6 +10,7 @@ import '../motion/motion.dart';
 import '../services/formatters.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'listing_photo.dart';
 import 'map_cluster.dart';
 
 /// Turned off in widget tests so no tile is requested from the network.
@@ -81,12 +82,56 @@ class _PawonMapState extends ConsumerState<PawonMap> {
   late final MapController _controller = widget.controller ?? MapController();
   late double _zoom = widget.initialZoom ?? zoomForSpan(widget.center.latitude, widget.radiusMeters * 2, widget.mini ? 128 : 250);
 
+  /// Full map only: the visible area padded by half a screen on every side. Listings outside it are not clustered or built
+  /// at all; the gate is recomputed only when the screen leaves it, so panning inside it costs no rebuild.
+  LatLngBounds? _gate;
+
+  /// The cluster threshold follows the zoom in these steps, so groups regroup a few times per pinch, not on every frame.
+  static const _zoomStep = 0.25;
+
+  static double _snap(double zoom) => (zoom / _zoomStep).round() * _zoomStep;
+
+  /// The zoom the clusters are computed at: the camera zoom snapped to the grid, so the groups depend on where the
+  /// camera ended and not on the path it took (a stale step used to leave one pin out of its circle after a zoom out).
+  late double _clusterZoom = _snap(_zoom);
+
+  /// Below this zoom a selected pin that was seen up close shrinks to a smaller photo circle.
+  static const _dotBelowZoom = 16.0;
+
+  /// The selected pin has been on screen at [_dotBelowZoom] or closer; so a tap that is still gliding in from far away
+  /// keeps its pill, and only zooming back out turns it into a circle.
+  bool _seenClose = false;
+
+  static LatLngBounds _padded(LatLngBounds b) {
+    final dLat = (b.north - b.south) * 0.5, dLng = (b.east - b.west) * 0.5;
+    return LatLngBounds(LatLng(b.south - dLat, b.west - dLng), LatLng(b.north + dLat, b.east + dLng));
+  }
+
+  void _onCamera(MapCamera camera) {
+    if (widget.mini) return;
+    final zoomed = _snap(camera.zoom) != _clusterZoom;
+    final visible = camera.visibleBounds;
+    if (zoomed || _gate == null || !_gate!.containsBounds(visible)) {
+      setState(() {
+        if (zoomed) {
+          _zoom = camera.zoom;
+          _clusterZoom = _snap(camera.zoom);
+        }
+        if (_zoom >= _dotBelowZoom && widget.selectedId != null) _seenClose = true;
+        _gate = _padded(visible);
+      });
+    }
+  }
+
   @override
   void didUpdateWidget(covariant PawonMap old) {
     super.didUpdateWidget(old);
+    if (old.selectedId != widget.selectedId) _seenClose = widget.selectedId != null && _zoom >= _dotBelowZoom;
     if (old.center != widget.center || old.radiusMeters != widget.radiusMeters) {
       final z = widget.initialZoom ?? zoomForSpan(widget.center.latitude, widget.radiusMeters * 2, widget.mini ? 128 : 250);
       _zoom = z;
+      _clusterZoom = _snap(z);
+      _gate = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _controller.move(widget.center, z);
       });
@@ -96,28 +141,26 @@ class _PawonMapState extends ConsumerState<PawonMap> {
   /// Label shown on a listing's price pin.
   static String _label(Listing l) => l.isFree ? 'Gratis' : formatRupiah(l.price);
 
-  /// Mini map callouts: for the nearest listings, a small dot on the exact spot and the price pill beside it (right,
-  /// left, above or below, whichever side is free). At this zoom everything within 1 km sits close to the user dot,
-  /// so a pill centred on its point would cover the dot or another pill. Pills stay fully on the map and clear of each
-  /// other, the dots, the user dot and the [PawonMap.keepClear] overlays. Returns each listing with the pill's
-  /// top-left relative to the listing's point.
+  /// Mini map callouts: for the nearest listings, a small dot on the exact spot and the food's photo circle beside it
+  /// (right, left, above or below, whichever side is free). At this zoom everything within 1 km sits close to the user
+  /// dot, so a circle centred on its point would cover the dot or another circle. Circles stay fully on the map and
+  /// clear of each other, the dots, the user dot and the [PawonMap.keepClear] overlays. Returns each listing with the
+  /// circle's top-left relative to the listing's point.
   List<(Listing, Offset)> _miniCallouts(Size size, LatLng user) {
     final c = widget.center, mpp = metersPerPixel(c.latitude, _zoom);
     final cosLat = math.cos(c.latitude * math.pi / 180);
     Offset toPx(LatLng p) => Offset(size.width / 2 + (p.longitude - c.longitude) * 111320 * cosLat / mpp, size.height / 2 - (p.latitude - c.latitude) * 110574 / mpp);
-    final style = AppTypography.text(15, weight: 700);
     final taken = <Rect>[Rect.fromCircle(center: toPx(user), radius: 16), ...?widget.keepClear?.call(size)];
     final bounds = (Offset.zero & size).deflate(4);
     final out = <(Listing, Offset)>[];
     for (final l in widget.listings) {
       if (out.length == PawonMap.miniPins) break;
-      final tp = TextPainter(text: TextSpan(text: _label(l), style: style), textDirection: TextDirection.ltr, maxLines: 1)..layout();
-      final w = tp.width + 31, p = toPx(l.position), dot = Rect.fromCircle(center: p, radius: 6);
-      tp.dispose();
+      const w = _pinH;
+      final p = toPx(l.position), dot = Rect.fromCircle(center: p, radius: 6);
       if (!bounds.contains(p) || taken.any((t) => t.overlaps(dot))) continue;
       const gap = _calloutGap;
-      for (final off in [const Offset(gap, -_pinH / 2), Offset(-gap - w, -_pinH / 2), Offset(-w / 2, -gap - _pinH), Offset(-w / 2, gap)]) {
-        final r = (p + off) & Size(w, _pinH);
+      for (final off in [const Offset(gap, -_pinH / 2), const Offset(-gap - w, -_pinH / 2), const Offset(-w / 2, -gap - _pinH), const Offset(-w / 2, gap)]) {
+        final r = (p + off) & const Size(w, _pinH);
         if (!bounds.contains(r.topLeft) || !bounds.contains(r.bottomRight) || taken.any((t) => t.inflate(4).overlaps(r))) continue;
         taken..add(r)..add(dot);
         out.add((l, off));
@@ -129,11 +172,12 @@ class _PawonMapState extends ConsumerState<PawonMap> {
 
   static const _pinH = 36.0, _calloutGap = 10.0;
 
-  /// A mini-map callout: the dot sits on the listing's point (the marker's centre), the pill at [off] from it.
+  /// A mini-map callout: the dot sits on the listing's point (the marker's centre), the photo circle at [off] from it.
   Marker _callout(Listing l, Offset off) {
-    const w = 280.0, h = 2 * (_pinH + _calloutGap) + 8;
+    const w = 2 * (_pinH + _calloutGap) + 8, h = w;
     final label = _label(l);
     return Marker(
+      key: ValueKey('callout_${l.id}'),
       point: l.position,
       width: w,
       height: h,
@@ -155,7 +199,7 @@ class _PawonMapState extends ConsumerState<PawonMap> {
                 ),
               ),
             ),
-            Positioned(left: w / 2 + off.dx, top: h / 2 + off.dy, child: _PricePin(label: label, free: l.isFree)),
+            Positioned(left: w / 2 + off.dx, top: h / 2 + off.dy, child: _PhotoCircle(l, size: _pinH, ring: l.isFree ? AppColors.primary : AppColors.accent)),
           ]),
         ),
       ),
@@ -171,12 +215,11 @@ class _PawonMapState extends ConsumerState<PawonMap> {
   Widget _map(Size? miniSize) {
     final tiles = ref.watch(tilesEnabledProvider);
     final user = widget.userPosition ?? widget.center;
-    // The selected listing always stays a single, highlighted pin drawn on top; the rest may cluster.
-    final rest = [for (final l in widget.listings) if (l.id != widget.selectedId) l];
-    final picked = [for (final l in widget.listings) if (l.id == widget.selectedId) l];
-    final clusters = miniSize != null
-        ? const <MapCluster>[]
-        : [...clusterListings(rest, 72 * metersPerPixel(widget.center.latitude, _zoom)), for (final l in picked) MapCluster(l)];
+    // Everything inside the gate clusters together, the selected listing too: zoomed out it joins the circle of its
+    // neighbours, zoomed in it is a single green pin. Listings outside the gate are not processed at all.
+    final gate = _gate;
+    final visible = gate == null ? widget.listings : [for (final l in widget.listings) if (gate.contains(l.position)) l];
+    final clusters = miniSize != null ? const <MapCluster>[] : clusterListings(visible, 72 * metersPerPixel(widget.center.latitude, _clusterZoom));
     final callouts = miniSize != null ? _miniCallouts(miniSize, user) : const <(Listing, Offset)>[];
     return FlutterMap(
       mapController: _controller,
@@ -188,9 +231,8 @@ class _PawonMapState extends ConsumerState<PawonMap> {
         backgroundColor: AppColors.mapSand,
         interactionOptions: InteractionOptions(flags: widget.mini ? InteractiveFlag.none : InteractiveFlag.all & ~InteractiveFlag.rotate),
         onTap: (_, _) => widget.onTapMap?.call(),
-        onPositionChanged: (camera, _) {
-          if ((camera.zoom - _zoom).abs() > 0.05 && !widget.mini) setState(() => _zoom = camera.zoom);
-        },
+        onMapReady: () => _onCamera(_controller.camera),
+        onPositionChanged: (camera, _) => _onCamera(camera),
       ),
       children: [
         if (tiles) pawonTileLayer(),
@@ -204,10 +246,11 @@ class _PawonMapState extends ConsumerState<PawonMap> {
           ),
         ]),
         MarkerLayer(markers: [
+          // The user's position goes first, so it is drawn under the pins and count circles that sit on top of it.
+          Marker(key: const ValueKey('user'), point: user, width: 28, height: 28, child: const UserDot()),
           for (final c in clusters)
             if (c.isSingle) _pin(c.listings.first) else _cluster(c),
           for (final (l, off) in callouts) _callout(l, off),
-          Marker(point: user, width: 28, height: 28, child: const UserDot()),
         ]),
         OsmCredit(bottom: widget.attributionBottom),
       ],
@@ -217,35 +260,40 @@ class _PawonMapState extends ConsumerState<PawonMap> {
   Marker _pin(Listing l) {
     final label = _label(l);
     final selected = l.id == widget.selectedId;
+    final small = selected && _seenClose && _zoom < _dotBelowZoom;
     return Marker(
+      key: ValueKey('pin_${l.id}'),
       point: l.position,
       width: 124,
-      height: 44, // tap target
-      child: Semantics(
+      height: 56, // tap target; the selected photo circle (52) fits, centred on the point
+      child: _FadeIn(child: Semantics(
         button: true,
         selected: selected,
-        label: '${l.name}, $label',
+        label: selected ? l.name : '${l.name}, $label',
         child: GestureDetector(
           onTap: () => widget.onSelect?.call(l),
-          // The selected pin grows a little and turns green, so the eye follows the tap.
+          // Every food is its photo in a circle, ringed by price type; the chosen one grows into a green ring (the card shows the price).
           child: Center(
-            child: AnimatedScale(
-              scale: selected ? 1.08 : 1,
+            child: AnimatedSwitcher(
               duration: Motion.of(context, Motion.base),
-              curve: Motion.pop,
-              child: _PricePin(label: label, free: l.isFree, selected: selected),
+              switchInCurve: Motion.pop,
+              transitionBuilder: (child, a) => ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: child)),
+              child: selected
+                  ? _PhotoCircle(l, size: small ? 36 : 52, key: ValueKey('selected_${small ? 'small' : 'large'}_${l.id}'))
+                  : _PhotoCircle(l, size: 44, ring: l.isFree ? AppColors.primary : AppColors.accent, key: ValueKey('photo_${l.id}')),
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 
   Marker _cluster(MapCluster c) => Marker(
+        key: ValueKey('cluster_${([for (final l in c.listings) l.id]..sort()).join('|')}'),
         point: c.center,
         width: 48,
         height: 48,
-        child: Semantics(
+        child: _FadeIn(child: Semantics(
           button: true,
           label: '${c.count} listing di area ini',
           child: GestureDetector(
@@ -261,7 +309,7 @@ class _PawonMapState extends ConsumerState<PawonMap> {
               child: Text('${c.count}', style: AppTypography.display(18, weight: 700, color: AppColors.background)),
             ),
           ),
-        ),
+        )),
       );
 
 }
@@ -280,30 +328,51 @@ List<LatLng> circlePoints(LatLng center, double meters) {
   return [for (var deg = 0; deg < 360; deg += 4) distance.offset(center, meters, deg.toDouble())];
 }
 
-/// Teardrop map pin as SVG ([hex] fill, white hole).
-/// Price-label pin: white pill with an accent border (green for free food), filled green when selected.
-class _PricePin extends StatelessWidget {
-  const _PricePin({required this.label, required this.free, this.selected = false});
+/// A food photo in a circle with a white rim and a coloured ring ([ring]), centred on the pickup point: the pin on both
+/// maps. Terracotta ring = paid, green = free; the selected listing is larger (smaller again when the map is zoomed
+/// out). No price: the card below shows it.
+class _PhotoCircle extends StatelessWidget {
+  const _PhotoCircle(this.listing, {super.key, required this.size, this.ring = AppColors.primary});
 
-  final String label;
-  final bool free;
-  final bool selected;
+  final Listing listing;
+  final double size;
+  final Color ring;
 
   @override
-  Widget build(BuildContext context) => AnimatedContainer(
-        duration: Motion.of(context, Motion.base),
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        alignment: Alignment.center,
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: selected ? null : Border.all(color: free ? AppColors.primary : AppColors.accent, width: 1.5),
+          color: ring,
+          shape: BoxShape.circle,
           boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 6, offset: Offset(0, 2))],
         ),
-        child: Text(label, softWrap: false, maxLines: 1, style: AppTypography.text(15, weight: 700, color: selected ? AppColors.background : AppColors.ink)),
+        child: Container(
+          padding: const EdgeInsets.all(3),
+          decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+          child: ListingPhoto(listing, width: size - 10, height: size - 10, radius: size),
+        ),
       );
 }
+
+/// Fades a marker in once when it is first built (it scrolled into view or its group changed), so markers do not pop.
+/// With a stable marker key an existing marker keeps its state and is not faded again.
+class _FadeIn extends StatelessWidget {
+  const _FadeIn({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: Motion.of(context, Motion.fast),
+        builder: (_, v, c) => Opacity(opacity: v, child: c),
+        child: child,
+      );
+}
+
+/// Teardrop map pin as SVG ([hex] fill, white hole).
 
 String teardropSvg(String hex, {double scale = 1}) =>
     '<svg xmlns="http://www.w3.org/2000/svg" width="${28 * scale}" height="${36 * scale}" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.2 0 13.8 0 24 14 36 14 36s14-12 14-22.2C28 6.2 21.7 0 14 0Z" fill="$hex"/><circle cx="14" cy="13.5" r="5" fill="#fff"/></svg>';

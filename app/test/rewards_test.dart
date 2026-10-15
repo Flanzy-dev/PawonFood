@@ -99,8 +99,14 @@ void main() {
   });
 
   group('full list sorting', () {
-    test('Terdekat sorts by distance, Segera habis by portions left', () {
+    test('Rekomendasi is the default and follows the score; Terdekat sorts by distance, Segera habis by portions left', () {
       final c = signedIn();
+      final ranked = c.read(sortedFeedProvider);
+      expect(c.read(feedSortProvider), FeedSort.recommended);
+      for (var i = 1; i < ranked.length; i++) {
+        expect(ranked[i].score, lessThanOrEqualTo(ranked[i - 1].score));
+      }
+      c.read(feedSortProvider.notifier).state = FeedSort.nearest;
       final nearest = c.read(sortedFeedProvider);
       for (var i = 1; i < nearest.length; i++) {
         expect(nearest[i].distance, greaterThanOrEqualTo(nearest[i - 1].distance));

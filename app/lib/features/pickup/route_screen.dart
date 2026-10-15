@@ -32,10 +32,14 @@ enum _Stage { plan, walking, arrived }
 
 /// B8b Rute ke titik ambil → B8c Dalam perjalanan → B8d Sudah sampai. Walking only.
 ///
-/// The start is the phone's GPS position when it can be read (else the chosen area), and the route comes from the
-/// OpenStreetMap foot router, with a straight-line estimate while it loads or when it cannot be found. While walking,
-/// "Kamu" follows live GPS and arrives within 30 m of the pickup point; without GPS, or on a long press of
-/// "Mulai jalan" (demo), the walk is animated.
+/// Two trips share the screen: the receiver walking to the pickup point, or, for "Minta diantar", the provider taking
+/// the food to the delivery address ("Rute antar", then "Buka QR ambil" on arrival). Both use the foot router: within
+/// 1 km it also follows the gangs a motorbike takes.
+///
+/// The start is the phone's GPS position when it can be read (else the chosen area, or the pickup point for a
+/// delivery), and the route comes from the OpenStreetMap foot router, with a straight-line estimate while it loads or
+/// when it cannot be found. While walking, "Kamu" follows live GPS and arrives within 30 m of the destination; without
+/// GPS, or on a long press of "Mulai jalan" / "Mulai antar" (demo), the walk is animated.
 class RouteScreen extends ConsumerStatefulWidget {
   const RouteScreen({super.key, required this.conversationId});
 
@@ -53,7 +57,7 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
     });
   var _stage = _Stage.plan;
 
-  late LatLng _from = ref.read(locationProvider).position;
+  late LatLng _from = _start();
   var _hasFix = false;
   WalkRoute? _route;
   var _routing = true;
@@ -62,7 +66,19 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
   /// Progress from live GPS (fraction of the path); the animation drives it otherwise.
   double? _gpsT;
 
+  /// Last live GPS fix while walking, where "Kamu" is drawn (not its projection onto the route).
+  LatLng? _gpsPos;
+
   String get _id => widget.conversationId;
+
+  /// Where the trip ends: the delivery address, or the pickup point.
+  static LatLng _dest(ReservationInfo r) => r.delivery?.position ?? r.listing.position;
+
+  /// Where it starts without GPS: the food's pickup point for a delivery (the provider's kitchen), else the chosen area.
+  LatLng _start() {
+    final r = ref.read(reservationProvider(widget.conversationId));
+    return r?.delivery != null ? r!.listing.position : ref.read(locationProvider).position;
+  }
 
   @override
   void initState() {
@@ -79,8 +95,9 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
 
   /// Opening the route is the request for the user's position: read GPS once (quietly), then ask for the route.
   Future<void> _prepare() async {
-    final dest = ref.read(reservationProvider(_id))?.listing.position;
-    if (dest == null) return;
+    final r = ref.read(reservationProvider(_id));
+    if (r == null) return;
+    final dest = _dest(r);
     final fix = await ref.read(deviceLocatorProvider).locate();
     if (!mounted) return;
     if (fix case LocationFound(:final position)) {
@@ -120,17 +137,21 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
   void _onPosition(LatLng pos) {
     final r = ref.read(reservationProvider(_id));
     if (r == null || _stage != _Stage.walking) return;
-    if (const Distance()(pos, r.listing.position) <= 30) {
+    if (const Distance()(pos, _dest(r)) <= 30) {
       _arrive();
       return;
     }
-    setState(() => _gpsT = progressAlong(_path(r.listing.position), pos));
+    setState(() {
+      _gpsPos = pos;
+      _gpsT = progressAlong(_path(_dest(r)), pos);
+    });
   }
 
   void _stop() {
     _track?.cancel();
     _track = null;
     _gpsT = null;
+    _gpsPos = null;
     _walk.stop();
     _walk.value = 0;
     setState(() => _stage = _Stage.plan);
@@ -143,7 +164,7 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
     setState(() => _stage = _Stage.arrived);
     final r = ref.read(reservationProvider(_id));
     // Put the pin in the free area above the sheet rather than at the screen centre.
-    if (r != null) _map.move(r.listing.position, 17.6, offset: const Offset(0, -190));
+    if (r != null) _map.move(_dest(r), 17.6, offset: const Offset(0, -190));
   }
 
   void _chat() => context.canPop() ? context.pop() : context.go('/chat/$_id');
@@ -152,13 +173,15 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     final r = ref.watch(reservationProvider(_id));
     if (r == null) return const NotFoundScaffold();
-    final dest = r.listing.position;
+    final dest = _dest(r);
+    final delivering = r.delivery != null;
     final route = _route ?? estimatedRoute(_from, dest);
     final path = route.path;
     final total = route.meters;
     final tiles = ref.watch(tilesEnabledProvider);
     final area = ref.watch(locationProvider).name;
-    final providerShort = shortName(r.provider.name);
+    // Who waits at the other end: the provider for a pickup, the receiver for a delivery.
+    final otherShort = delivering ? firstName(r.receiver.name) : shortName(r.provider.name);
     final top = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
@@ -201,15 +224,17 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
                         width: 180,
                         height: 92,
                         alignment: Alignment.topCenter,
-                        child: Column(children: [
-                          MapLabel(_stage == _Stage.arrived ? 'Kamu sudah sampai' : r.provider.name, outlined: true),
+                        // Bottom-aligned: the marker's bottom edge is the point, so the pin's tip must end exactly there.
+                        child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                          MapLabel(_stage == _Stage.arrived ? 'Kamu sudah sampai' : (delivering ? r.receiver.name : r.provider.name), outlined: true),
                           const SizedBox(height: 6),
-                          SvgPicture.string(teardropSvg('#2F5D39', scale: 1.3), semanticsLabel: 'Titik ambil'),
+                          SvgPicture.string(teardropSvg('#2F5D39', scale: 1.3), semanticsLabel: delivering ? 'Alamat antar' : 'Titik ambil'),
                         ]),
                       ),
                       if (_stage != _Stage.arrived)
                         Marker(
-                          point: me,
+                          // The real fix while walking with GPS; `me` is that fix projected onto the route (progress only).
+                          point: _gpsPos ?? me,
                           width: 120,
                           height: 92,
                           // Dot centre sits on the point: 32 + 14 = 46 = half of 92.
@@ -226,7 +251,7 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
                 ),
               ),
               if (_stage == _Stage.walking)
-                Positioned(top: top + 12, left: 16, right: 16, child: FadeSlideIn(child: _InstructionCard(route: route, t: t)))
+                Positioned(top: top + 12, left: 16, right: 16, child: FadeSlideIn(child: _InstructionCard(route: route, t: t, delivering: delivering)))
               else
                 Positioned(top: top + 8, left: 16, child: RoundIconButton(icon: LucideIcons.arrowLeft, semanticLabel: 'Kembali', shadow: true, onTap: _chat)),
               Positioned(
@@ -239,16 +264,17 @@ class _RouteScreenState extends ConsumerState<RouteScreen> with SingleTickerProv
                       _Stage.plan => _PlanBody(
                           key: const ValueKey('plan'),
                           info: r,
-                          from: _hasFix ? 'Lokasi kamu saat ini' : 'Lokasi kamu · $area',
+                          from: _hasFix ? 'Lokasi kamu saat ini' : (delivering ? r.listing.pickupPoint : 'Lokasi kamu · $area'),
                           note: _routing ? 'Mencari rute jalan...' : (route.fromStreets ? null : 'Rute perkiraan · jalan belum termuat'),
                           meters: total,
-                          providerShort: providerShort,
+                          otherShort: otherShort,
                           onChat: _chat,
                           onStart: _begin,
                           onDemoStart: () => _begin(demo: true),
                         ),
                       _Stage.walking => _WalkBody(key: const ValueKey('walk'), info: r, left: total * (1 - t), t: t, onChat: _chat, onStop: _stop),
-                      _Stage.arrived => _ArrivedBody(key: const ValueKey('arrived'), info: r, providerShort: providerShort, onChat: _chat, onScan: () => context.push('/scan/$_id')),
+                      // The receiver scans the provider's QR; the provider who delivered opens it.
+                      _Stage.arrived => _ArrivedBody(key: const ValueKey('arrived'), info: r, otherShort: otherShort, onChat: _chat, onAction: () => context.push(delivering ? '/qr/$_id' : '/scan/$_id')),
                     },
                   ),
                 ),
@@ -302,12 +328,22 @@ class _ChatAndAction extends StatelessWidget {
       ]);
 }
 
-String _payTitle(ReservationInfo r) => r.amount == 0 ? 'Gratis' : r.pickup.paid ? 'Lunas' : 'Bayar ${formatRupiah(r.amount)}';
+/// What changes hands at the end of the trip: the receiver pays on a pickup, the provider receives on a delivery.
+String _payTitle(ReservationInfo r) {
+  if (r.total == 0) return 'Gratis';
+  if (r.pickup.paid) return 'Lunas';
+  return r.delivery == null ? 'Bayar ${formatRupiah(r.payable)}' : 'Terima ${formatRupiah(r.payable)}';
+}
 
-String _payCaption(ReservationInfo r) => r.amount == 0 ? 'tidak perlu bayar' : r.pickup.paid ? 'via QRIS' : 'di tempat saat ambil';
+String _payCaption(ReservationInfo r) {
+  if (r.total == 0) return 'tidak perlu bayar';
+  if (r.pickup.paid) return 'via QRIS';
+  if (r.delivery == null) return 'di tempat saat ambil';
+  return r.pickup.payMethod == null ? 'belum pilih cara bayar' : 'tunai saat sampai';
+}
 
 class _PlanBody extends StatelessWidget {
-  const _PlanBody({super.key, required this.info, required this.from, required this.meters, required this.providerShort, required this.onChat, required this.onStart, required this.onDemoStart, this.note});
+  const _PlanBody({super.key, required this.info, required this.from, required this.meters, required this.otherShort, required this.onChat, required this.onStart, required this.onDemoStart, this.note});
 
   final ReservationInfo info;
   final String from;
@@ -315,20 +351,23 @@ class _PlanBody extends StatelessWidget {
   /// Route status under the title: still loading, or only an estimate.
   final String? note;
   final double meters;
-  final String providerShort;
+
+  /// The provider (pickup) or the receiver (delivery), first name.
+  final String otherShort;
   final VoidCallback onChat;
   final VoidCallback onStart;
 
-  /// Long press on "Mulai jalan": the animated walk, for demos.
+  /// Long press on "Mulai jalan" / "Mulai antar": the animated walk, for demos.
   final VoidCallback onDemoStart;
 
   @override
   Widget build(BuildContext context) {
     final deadline = formatTime(info.pickup.deadline);
+    final drop = info.delivery;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Rute jalan kaki', style: AppTypography.titleL),
+        Text(drop == null ? 'Rute jalan kaki' : 'Rute antar', style: AppTypography.titleL),
         if (note != null) ...[
           const SizedBox(height: 2),
           FadeSwitch(child: Text(note!, key: ValueKey(note), style: AppTypography.text(13, color: AppColors.inkMuted))),
@@ -336,12 +375,14 @@ class _PlanBody extends StatelessWidget {
         const SizedBox(height: 12),
         _Stop(icon: LucideIcons.circle, caption: 'Dari', title: from),
         Padding(padding: const EdgeInsets.only(left: 9), child: Column(children: [for (var i = 0; i < 3; i++) Container(width: 4, height: 4, margin: const EdgeInsets.symmetric(vertical: 1.5), decoration: const BoxDecoration(color: AppColors.inkMuted, shape: BoxShape.circle))])),
-        _Stop(icon: LucideIcons.mapPin, caption: 'Ke', title: info.provider.name, sub: '${info.listing.pickupPoint} · titik ambil'),
+        drop == null
+            ? _Stop(icon: LucideIcons.mapPin, caption: 'Ke', title: info.provider.name, sub: '${info.listing.pickupPoint} · titik ambil')
+            : _Stop(icon: LucideIcons.mapPin, caption: 'Ke', title: info.receiver.name, sub: '${drop.address} · alamat antar'),
         const Divider(height: 24),
         Wrap(spacing: 8, runSpacing: 8, children: [
           Pill(formatDistance(meters), icon: LucideIcons.personStanding, height: 32, size: 13, weight: 700),
           Pill('± ${walkMinutes(meters)} mnt', height: 32, size: 13, weight: 700),
-          Pill('Direservasi s/d $deadline', fill: AppColors.successTint, color: AppColors.primaryDark, height: 32, size: 13, weight: 700),
+          Pill(drop == null ? 'Direservasi s/d $deadline' : 'Diantar s/d $deadline', fill: AppColors.successTint, color: AppColors.primaryDark, height: 32, size: 13, weight: 700),
         ]),
         const SizedBox(height: 12),
         Container(
@@ -357,7 +398,7 @@ class _PlanBody extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Pindai QR di HP $providerShort', style: AppTypography.text(13, color: AppColors.inkMuted)),
+                Text(drop == null ? 'Pindai QR di HP $otherShort' : 'Tunjukkan QR ke $otherShort', style: AppTypography.text(13, color: AppColors.inkMuted)),
                 Text('Berlaku s/d $deadline', style: AppTypography.display(17, weight: 700, height: 22)),
               ]),
             ),
@@ -372,7 +413,7 @@ class _PlanBody extends StatelessWidget {
           onChat: onChat,
           action: Semantics(
             onLongPressHint: 'Demo jalan tanpa GPS',
-            child: GestureDetector(onLongPress: onDemoStart, child: AppButton(label: 'Mulai jalan', onPressed: onStart)),
+            child: GestureDetector(onLongPress: onDemoStart, child: AppButton(label: drop == null ? 'Mulai jalan' : 'Mulai antar', onPressed: onStart)),
           ),
         ),
       ],
@@ -412,36 +453,52 @@ class _WalkBody extends StatelessWidget {
   final VoidCallback onStop;
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) {
+    final drop = info.delivery;
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Sisa ${formatDistance(left)} · ± ${walkMinutes(left)} mnt', style: AppTypography.titleL),
           const SizedBox(height: 4),
-          Text('ke ${info.provider.name} · ${info.listing.pickupPoint}', style: AppTypography.text(14, color: AppColors.inkMuted)),
+          Text(drop == null ? 'ke ${info.provider.name} · ${info.listing.pickupPoint}' : 'ke ${info.receiver.name} · ${drop.address}', style: AppTypography.text(14, color: AppColors.inkMuted)),
           const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(value: t, minHeight: 8, color: AppColors.primary, backgroundColor: AppColors.surfaceSand),
           ),
           const SizedBox(height: 14),
-          Pill('Pindai QR s/d ${formatTime(info.pickup.deadline)}', height: 30, size: 13, weight: 700),
+          Pill('${drop == null ? 'Pindai' : 'Tunjukkan'} QR s/d ${formatTime(info.pickup.deadline)}', height: 30, size: 13, weight: 700),
           const SizedBox(height: 16),
           _ChatAndAction(onChat: onChat, action: AppButton(label: 'Akhiri rute', variant: AppButtonVariant.outline, onPressed: onStop)),
         ],
       );
+  }
 }
 
 class _ArrivedBody extends ConsumerWidget {
-  const _ArrivedBody({super.key, required this.info, required this.providerShort, required this.onChat, required this.onScan});
+  const _ArrivedBody({super.key, required this.info, required this.otherShort, required this.onChat, required this.onAction});
 
   final ReservationInfo info;
-  final String providerShort;
+
+  /// The provider (pickup) or the receiver (delivery), first name.
+  final String otherShort;
   final VoidCallback onChat;
-  final VoidCallback onScan;
+
+  /// "Pindai QR" for the receiver, "Buka QR ambil" for the provider who delivered.
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pay = info.amount == 0 ? '' : info.pickup.paid ? ' Sudah lunas via QRIS.' : ' Bayar ${formatRupiah(info.amount)} di tempat.';
+    final drop = info.delivery;
+    final pay = info.total == 0
+        ? ''
+        : info.pickup.paid
+            ? ' Sudah lunas via QRIS.'
+            : drop == null
+                ? ' Bayar ${formatRupiah(info.payable)} di tempat.'
+                : info.pickup.payMethod == null
+                    ? ' $otherShort belum memilih cara bayar.'
+                    : ' Terima ${formatRupiah(info.payable)} tunai.';
     final deadline = formatTime(info.pickup.deadline);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,7 +508,7 @@ class _ArrivedBody extends ConsumerWidget {
           const SizedBox(width: 4),
           Expanded(child: Text('Kamu sudah sampai', style: AppTypography.titleL)),
         ]),
-        Text('Minta $providerShort membuka QR, lalu pindai.$pay', style: AppTypography.text(15, height: 22)),
+        Text(drop == null ? 'Minta $otherShort membuka QR, lalu pindai.$pay' : 'Buka QR ambil, lalu minta $otherShort memindainya.$pay', style: AppTypography.text(15, height: 22)),
         const SizedBox(height: 12),
         Container(
           width: double.infinity,
@@ -474,17 +531,22 @@ class _ArrivedBody extends ConsumerWidget {
               now: ref.read(clockProvider),
               builder: (_, left) => Text('Berlaku s/d $deadline · sisa ${formatMinutesLeft(left)}', style: AppTypography.display(16, weight: 700, height: 22)),
             ),
-            Text('Setelah dipindai, kamu langsung bisa beri ulasan.', style: AppTypography.text(13, color: AppColors.inkMuted)),
+            Text(drop == null ? 'Setelah dipindai, kamu langsung bisa beri ulasan.' : 'Setelah dipindai, poinmu langsung bertambah.', style: AppTypography.text(13, color: AppColors.inkMuted)),
           ]),
         ),
         const SizedBox(height: 12),
         Row(children: [
           const Icon(LucideIcons.mapPin, size: 18, color: AppColors.inkMuted),
           const SizedBox(width: 8),
-          Expanded(child: Text('${info.provider.name} · ${info.listing.pickupPoint}', style: AppTypography.text(14, color: AppColors.inkMuted))),
+          Expanded(child: Text(drop == null ? '${info.provider.name} · ${info.listing.pickupPoint}' : '${info.receiver.name} · ${drop.address}', style: AppTypography.text(14, color: AppColors.inkMuted))),
         ]),
         const SizedBox(height: 16),
-        _ChatAndAction(onChat: onChat, action: AppButton(label: 'Pindai QR', icon: LucideIcons.scanLine, onPressed: onScan)),
+        _ChatAndAction(
+          onChat: onChat,
+          action: drop == null
+              ? AppButton(label: 'Pindai QR', icon: LucideIcons.scanLine, onPressed: onAction)
+              : AppButton(label: 'Buka QR ambil', icon: LucideIcons.qrCode, onPressed: onAction),
+        ),
       ],
     );
   }
@@ -493,10 +555,13 @@ class _ArrivedBody extends ConsumerWidget {
 /// Dark turn-by-turn card on top of the map while walking (B8c): the next turn of the route, how far it is, and the
 /// straight bit after it.
 class _InstructionCard extends StatelessWidget {
-  const _InstructionCard({required this.route, required this.t});
+  const _InstructionCard({required this.route, required this.t, required this.delivering});
 
   final WalkRoute route;
   final double t;
+
+  /// Heading for the delivery address rather than the pickup point.
+  final bool delivering;
 
   static IconData _icon(TurnKind k) => switch (k) {
         TurnKind.left || TurnKind.sharpLeft => LucideIcons.cornerUpLeft,
@@ -521,7 +586,7 @@ class _InstructionCard extends StatelessWidget {
     }
     final toTurn = (next?.startsAt ?? total) - walked;
     final last = next == null || next.turn == TurnKind.arrive;
-    final turn = last ? 'Lurus sampai titik ambil' : next.instruction;
+    final turn = last ? 'Lurus sampai ${delivering ? 'alamat antar' : 'titik ambil'}' : next.instruction;
     final icon = last ? LucideIcons.arrowUp : _icon(next.turn);
     final after = last || next.length <= 0 ? null : 'Lalu lurus ${formatDistance(next.length)}';
     return Container(

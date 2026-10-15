@@ -37,6 +37,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   late final AppCamera _camera = ref.read(cameraFactoryProvider)();
   var _cameraReady = false;
   var _found = false;
+  var _alreadyScanned = false;
   Timer? _timer;
   final _frame = GlobalKey();
 
@@ -75,7 +76,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     setState(() => _found = true);
     unawaited(HapticFeedback.mediumImpact());
     final outcome = ref.read(chatProvider.notifier).scanQr(_id);
-    if (outcome == ScanOutcome.ok || outcome == ScanOutcome.alreadyUsed) {
+    // One QR, one scan: a second scan must not replay the success and the review.
+    if (outcome == ScanOutcome.alreadyUsed) setState(() => _alreadyScanned = true);
+    if (outcome == ScanOutcome.ok) {
       // A beat on "QR terbaca", then green grows out of the viewfinder and opens onto the review.
       await Future<void>.delayed(Motion.of(context, Motion.base));
       if (!mounted) return;
@@ -130,8 +133,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                 AnimatedSwitcher(
                                   duration: Motion.of(context, Motion.base),
                                   child: Pill(
-                                    _found ? 'QR terbaca' : 'Arahkan ke QR $providerShort',
-                                    key: ValueKey(_found),
+                                    _alreadyScanned ? 'QR sudah dipindai' : _found ? 'QR terbaca' : 'Arahkan ke QR $providerShort',
+                                    key: ValueKey('$_found$_alreadyScanned'),
                                     fill: _found ? AppColors.detectBox : AppColors.surface,
                                     color: AppColors.primaryDark,
                                     height: 34,

@@ -28,7 +28,7 @@ class ExpiredScreen extends ConsumerWidget {
         back: true,
         fallback: '/chat/$conversationId',
         title: 'QR sudah kedaluwarsa',
-        body: 'Reservasi ${r.receiver.name.split(' ').first} berakhir pukul $deadline. Porsinya dibuka lagi untuk penerima lain.',
+        body: 'Reservasi ${firstName(r.receiver.name)} berakhir pukul $deadline. Porsinya dibuka lagi untuk penerima lain.',
         actions: [AppButton(label: 'Kembali ke chat', onPressed: () => context.go('/chat/$conversationId'))],
       );
     }

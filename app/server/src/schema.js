@@ -4,6 +4,7 @@
 export const CATEGORIES = ['makanan_matang', 'bahan_mentah', 'makanan_kemasan', 'bukan_makanan', 'unknown'];
 export const VISUAL_CONDITIONS = ['no_visible_issues', 'minor_concerns', 'visible_spoilage', 'cannot_assess'];
 export const IMAGE_QUALITIES = ['good', 'blurry', 'too_dark', 'obstructed', 'too_far'];
+export const HEALTH_SIGNALS = ['sayur_buah', 'protein', 'digoreng', 'direbus_kukus'];
 
 export const MAX_NOTES = 8;
 export const MAX_NOTE_LENGTH = 80;
@@ -28,11 +29,11 @@ export function extractJson(text) {
   }
 }
 
-const clean = (s) => s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+export const clean = (s) => s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
 
 // Notes that claim a confidence score or certify safety are dropped: the model was told not to make them, and the
 // app must never show them as if PawonFood had checked the food.
-const FORBIDDEN_NOTE = /\d+(?:[.,]\d+)?\s*%|aman (?:untuk )?dikonsumsi|aman dimakan|layak (?:makan|konsumsi)|safe to eat|safe for consumption|kedaluwarsa \d|expire/i;
+export const FORBIDDEN_NOTE = /\d+(?:[.,]\d+)?\s*%|aman (?:untuk )?dikonsumsi|aman dimakan|layak (?:makan|konsumsi)|safe to eat|safe for consumption|kedaluwarsa \d|expire/i;
 
 function notes(value, field) {
   if (value === undefined || value === null) return [];
@@ -52,6 +53,22 @@ function oneOf(value, allowed, field) {
   const v = value.trim().toLowerCase();
   if (!allowed.includes(v)) throw new ModelResponseError(`${field} has an unexpected value`);
   return v;
+}
+
+/**
+ * Optional list of visible-composition signals. Missing means none (older prompts); unknown values are dropped, so a
+ * creative model answer cannot add a tag the app does not know.
+ */
+export function healthSignals(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new ModelResponseError('health_signals is not a list');
+  const out = [];
+  for (const item of value) {
+    if (typeof item !== 'string') throw new ModelResponseError('health_signals has a non-text item');
+    const v = item.trim().toLowerCase();
+    if (HEALTH_SIGNALS.includes(v) && !out.includes(v)) out.push(v);
+  }
+  return out;
 }
 
 /** Normalises the category; values outside the contract become "unknown" so the provider has to pick one. */
@@ -81,6 +98,7 @@ export function parseObservation(raw) {
     visible_signs: notes(raw.visible_signs, 'visible_signs'),
     image_quality: oneOf(raw.image_quality, IMAGE_QUALITIES, 'image_quality'),
     warnings: notes(raw.warnings, 'warnings'),
+    health_signals: raw.is_food ? healthSignals(raw.health_signals) : [],
   };
 }
 

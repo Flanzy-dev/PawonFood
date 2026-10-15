@@ -1,4 +1,5 @@
-// HTTP layer: POST /v1/food-validation (raw JPEG/PNG body) and GET /healthz. Built on node:http with no dependencies.
+// HTTP layer: POST /v1/food-validation (raw JPEG/PNG body), POST /v1/recipe-ideas (JSON) and GET /healthz. Built on
+// node:http with no dependencies.
 
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
@@ -6,6 +7,7 @@ import http from 'node:http';
 import { checkUpload, UploadError } from './image.js';
 import { ProviderError } from './qwen.js';
 import { createRateLimiter } from './rate_limit.js';
+import { readIngredients, suggestRecipes } from './recipes.js';
 import { ModelResponseError } from './schema.js';
 import { validateFood } from './validate.js';
 
@@ -16,6 +18,7 @@ const PUBLIC_ERRORS = {
   model_timeout: [504, 'The AI check took too long. Try again.'],
   model_unavailable: [502, 'The AI check is unavailable right now. Try again.'],
   model_bad_response: [502, 'The AI check returned an unreadable answer. Try again.'],
+  request_invalid: [400, 'Send JSON {"ingredients": "..."} with 2 to 200 characters.'],
   not_found: [404, 'Not found.'],
   method_not_allowed: [405, 'Method not allowed.'],
   internal: [500, 'Something went wrong. Try again.'],
@@ -76,6 +79,9 @@ function readBody(req, limit) {
   });
 }
 
+/** Recipe requests are a short JSON object. */
+const MAX_JSON_BYTES = 2048;
+
 const tooLarge = (config) => `The image is larger than ${config.maxUploadBytes} bytes.`;
 
 function clientIp(req, trustProxy) {
@@ -88,22 +94,13 @@ function clientIp(req, trustProxy) {
 
 /**
  * Creates the HTTP server (not yet listening).
- * @param {{config: object, provider: {describe: Function}, log: Function, now?: () => number}} deps
+ * @param {{config: object, provider: {describe: Function, complete: Function}, log: Function, now?: () => number}} deps
  */
 export function createApp({ config, provider, log, now = Date.now }) {
   const limiter = createRateLimiter({ limit: config.rateLimitPerMin, now });
 
   async function validationRoute(req, res, ctx) {
-    // Early answers still drain the upload (resume), so the client reads the status instead of a connection reset.
-    if (config.clientToken && !tokenMatches(req.headers['x-pawon-client'], config.clientToken)) {
-      req.resume();
-      return sendError(res, 'unauthorized');
-    }
-    const slot = limiter.take(clientIp(req, config.trustProxy));
-    if (!slot.ok) {
-      req.resume();
-      return sendError(res, 'rate_limited', { headers: { 'Retry-After': String(slot.retryAfterSec) } });
-    }
+    if (!admit(req, res)) return;
 
     let body;
     try {
@@ -127,6 +124,51 @@ export function createApp({ config, provider, log, now = Date.now }) {
     send(res, 200, result);
   }
 
+  /** Client token and rate limit, shared by both model routes. Returns false when the request was answered. */
+  function admit(req, res) {
+    // Early answers still drain the upload (resume), so the client reads the status instead of a connection reset.
+    if (config.clientToken && !tokenMatches(req.headers['x-pawon-client'], config.clientToken)) {
+      req.resume();
+      sendError(res, 'unauthorized');
+      return false;
+    }
+    const slot = limiter.take(clientIp(req, config.trustProxy));
+    if (!slot.ok) {
+      req.resume();
+      sendError(res, 'rate_limited', { headers: { 'Retry-After': String(slot.retryAfterSec) } });
+      return false;
+    }
+    return true;
+  }
+
+  async function recipeRoute(req, res, ctx) {
+    if (!admit(req, res)) return;
+    if (!String(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) {
+      req.resume();
+      return sendError(res, 'request_invalid', { status: 415, message: 'Send application/json.' });
+    }
+    let body;
+    try {
+      body = await readBody(req, MAX_JSON_BYTES);
+    } catch (e) {
+      if (!(e instanceof BodyTooLargeError)) throw e;
+      res.on('finish', () => req.destroy());
+      return sendError(res, 'request_invalid', { status: 413, headers: { Connection: 'close' } });
+    }
+    if (body === null) return sendError(res, 'request_invalid', { status: 413 });
+    let parsed;
+    try {
+      parsed = JSON.parse(body.toString('utf8'));
+    } catch {
+      return sendError(res, 'request_invalid');
+    }
+    const ingredients = readIngredients(parsed?.ingredients);
+    if (ingredients === null) return sendError(res, 'request_invalid');
+    const result = await suggestRecipes(ingredients, provider);
+    ctx.recipes = result.recipes.length;
+    send(res, 200, result);
+  }
+
   async function handle(req, res) {
     const started = now();
     const reqId = randomUUID();
@@ -141,6 +183,10 @@ export function createApp({ config, provider, log, now = Date.now }) {
       if (url.pathname === '/v1/food-validation') {
         if (req.method !== 'POST') return sendError(res, 'method_not_allowed', { headers: { Allow: 'POST' } });
         return await validationRoute(req, res, ctx);
+      }
+      if (url.pathname === '/v1/recipe-ideas') {
+        if (req.method !== 'POST') return sendError(res, 'method_not_allowed', { headers: { Allow: 'POST' } });
+        return await recipeRoute(req, res, ctx);
       }
       return sendError(res, 'not_found');
     } catch (e) {

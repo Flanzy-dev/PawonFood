@@ -12,7 +12,9 @@ Return exactly these keys:
   "visual_condition": string,    // one of: "no_visible_issues", "minor_concerns", "visible_spoilage", "cannot_assess"
   "visible_signs": string[],     // short Indonesian phrases for signs you can actually see, e.g. "jamur putih di permukaan"
   "image_quality": string,       // one of: "good", "blurry", "too_dark", "obstructed", "too_far"
-  "warnings": string[]           // short Indonesian notes about ambiguity, e.g. "lebih dari satu jenis makanan"
+  "warnings": string[],          // short Indonesian notes about ambiguity, e.g. "lebih dari satu jenis makanan"
+  "health_signals": string[]     // what the food visibly contains or how it looks cooked; any of "sayur_buah",
+                                 // "protein", "digoreng", "direbus_kukus"
 }
 
 Categories:
@@ -32,6 +34,10 @@ Rules:
 - If the photo is blurry, too dark, blocked, or the food is too small in the frame, set "image_quality" accordingly.
 - If the photo shows a screen, a printed picture or a photo of a photo, set "is_food" to false and category
   "bukan_makanan", and add a warning.
+- "health_signals" lists only what you can see: "sayur_buah" for visible vegetables or fruit, "protein" for visible
+  meat, fish, egg, tofu or tempeh, "digoreng" when something looks deep-fried, "direbus_kukus" when the food looks
+  boiled, steamed or served in a clear soup. Use [] when the photo is not food or nothing applies. These are
+  observations, not a health rating.
 - Never give confidence percentages, scores, expiry dates or a shelf life.
 - Never state or imply that the food is safe, fresh or fit to eat. You describe; you do not certify.
 - Keep each list to at most 5 items, each under 60 characters. Use [] when there is nothing to report.`;

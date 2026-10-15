@@ -8,6 +8,7 @@ import '../models/enums.dart';
 import '../models/listing.dart';
 import '../models/person.dart';
 import '../services/formatters.dart';
+import '../services/fyp.dart';
 import '../services/negotiation.dart';
 import '../services/points.dart';
 import '../services/validators.dart';
@@ -89,30 +90,40 @@ class ChatNotifier extends Notifier<List<Conversation>> {
         ? 'Siap, saya tunggu ya.'
         : lower.contains('masih ada')
             ? (l.isSoldOut ? 'Maaf, sudah habis.' : 'Masih ada ${l.portionsLeft} porsi, silakan.')
-            : 'Oke, noted ya.';
+            : lower.contains('diantar')
+                ? (l.canDeliver
+                    ? 'Bisa, ${l.deliveryFee == 0 ? 'gratis ongkir' : 'ongkirnya ${formatRupiah(l.deliveryFee!)}'}. Pilih "Minta diantar" di halaman makanan ya.'
+                    : 'Maaf, belum bisa antar. Ambil sendiri ya.')
+                : 'Oke, noted ya.';
     _counterpartSays(id, reply);
   }
 
-  /// Receiver sends an offer, optionally with a note for the provider. Returns an error message when the amount is
-  /// invalid. Nothing is reserved until the provider accepts (B10j "Menunggu jawaban").
-  String? sendOffer(String id, int amount, {int portions = 1, String message = ''}) {
+  /// "Minta diantar" as the listing allows it: the fee always comes from the listing, never from the request.
+  Delivery? _deliveryFor(Listing l, Delivery? d) => d == null ? null : Delivery(address: d.address, position: d.position, fee: l.deliveryFee ?? 0);
+
+  /// Receiver sends an offer, optionally with a note for the provider and a delivery request. Returns an error message
+  /// when the amount or the delivery is invalid. Nothing is reserved until the provider accepts (B10j "Menunggu jawaban").
+  /// The offer bubble only says "diantar": the provider sees the address once the reservation exists (PRD Privacy).
+  String? sendOffer(String id, int amount, {int portions = 1, String message = '', Delivery? delivery}) {
     final c = byId(id);
     if (c == null) return 'Percakapan tidak ditemukan';
     final l = _listing(c.listingId);
-    final error = Validators.offerAmount(amount, l.price);
+    final error = Validators.offerAmount(amount, l.price) ?? Validators.handoverRequest(l, delivery?.position);
     if (error != null) return error;
     final note = message.trim();
+    final drop = _deliveryFor(l, delivery);
     _update(
       id,
       (c) => c.copyWith(
-        offer: Offer(id: 'o_$id', listingId: c.listingId, receiverId: meId, amount: amount, portions: portions),
+        offer: Offer(id: 'o_$id', listingId: c.listingId, receiverId: meId, amount: amount, portions: portions, delivery: drop),
         messages: [
           ...c.messages,
-          _msg(meId, MessageType.offer, 'Tawaran ${formatRupiah(amount)} · $portions porsi', amount: amount),
+          _msg(meId, MessageType.offer, 'Tawaran ${formatRupiah(amount)} · $portions porsi${drop == null ? '' : ' · diantar'}', amount: amount),
           if (note.isNotEmpty) _msg(meId, MessageType.text, note),
         ],
       ),
     );
+    ref.read(fypEventsProvider)(l, FypEvent.addtocart); // an offer is a strong "I want this"
     _resolveOffer(id);
     return null;
   }
@@ -142,20 +153,28 @@ class ChatNotifier extends Notifier<List<Conversation>> {
   /// System line behind the accepted card (hidden in the chat, the card shows it).
   static bool isAcceptanceLine(Message m) => m.type == MessageType.system && (m.body.endsWith(' diterima.') || m.body.endsWith(' disetujui.'));
 
-  /// Accepts the pending offer and reserves the portions until the pickup deadline.
+  /// Accepts the pending offer and reserves the portions until the pickup deadline. The portions come out of "Sisa N
+  /// porsi" now, and go back if the reservation expires.
   void _accept(String id, {required String from}) {
     final c = byId(id)!;
     final l = _listing(c.listingId);
     final offer = c.offer!;
+    // The portions may have gone to someone else while the offer was waiting for an answer.
+    if (!ref.read(listingsProvider.notifier).hold(l.id, offer.portions)) {
+      _update(id, (c) => c.copyWith(offer: offer.copyWith(status: OfferStatus.rejected)));
+      _addMessage(id, _msg(from, MessageType.text, 'Maaf, porsinya sudah habis.'), unread: from != meId);
+      return;
+    }
     final amount = offer.amount;
     final isMe = from == meId;
-    final speech = isMe ? 'Boleh, silakan ambil sebelum ${formatTime(l.pickupBy)} ya.' : 'Boleh, Mas. Ambil sebelum ${formatTime(l.pickupBy)} ya.';
+    final by = formatTime(l.pickupBy);
+    final speech = offer.delivery != null ? 'Boleh, saya antar sebelum $by ya.' : (isMe ? 'Boleh, silakan ambil sebelum $by ya.' : 'Boleh, Mas. Ambil sebelum $by ya.');
     final system = amount == 0 ? 'Ambil gratis disetujui.' : 'Tawaran ${formatRupiah(amount)} diterima.';
     _update(
       id,
       (c) => c.copyWith(
         offer: offer.copyWith(status: OfferStatus.accepted),
-        pickup: Pickup(id: 'pk_$id', deadline: l.pickupBy),
+        pickup: Pickup(id: 'pk_$id', deadline: l.pickupBy, held: offer.portions),
         messages: [...c.messages, _msg(from, MessageType.text, speech), _msg('system', MessageType.system, system)],
         unread: isMe ? c.unread : c.unread + 1,
       ),
@@ -175,27 +194,51 @@ class ChatNotifier extends Notifier<List<Conversation>> {
     _addMessage(id, _msg(meId, MessageType.text, 'Maaf, belum bisa di harga itu ya.'));
   }
 
-  /// "Ambil · RpX": reserves the food at the listed price, no negotiation. Returns the thread id.
-  String claim(String listingId) {
+  /// "Ambil · RpX": reserves the food at the listed price, no negotiation, picked up or delivered ([delivery]). Returns
+  /// the thread id. A handover the listing does not allow (pickup of delivery-only food, a delivery it can not make)
+  /// reserves nothing, and the thread says why.
+  String claim(String listingId, {Delivery? delivery}) {
     final id = openForListing(listingId);
     final c = byId(id)!;
     if (c.pickup != null && c.pickup!.open) return id;
     final l = _listing(listingId);
+    final handoverError = Validators.handoverRequest(l, delivery?.position);
+    if (handoverError != null) {
+      _addMessage(id, _msg('system', MessageType.system, handoverError));
+      return id;
+    }
+    final drop = _deliveryFor(l, delivery);
+    if (!ref.read(listingsProvider.notifier).hold(listingId, 1)) {
+      // Someone reserved the last portion first: nothing is reserved and the thread says why.
+      _update(id, (c) => c.copyWith(closedSoldOut: true));
+      _addMessage(id, _msg('system', MessageType.system, 'Maaf, makanan ini sudah habis.'));
+      return id;
+    }
     final system = l.isFree ? 'Ambil gratis disetujui.' : 'Ambil ${formatRupiah(l.price)} disetujui.';
     _update(
       id,
       (c) => c.copyWith(
-        offer: Offer(id: 'o_$id', listingId: listingId, receiverId: meId, amount: l.price, status: OfferStatus.accepted),
-        pickup: Pickup(id: 'pk_$id', deadline: l.pickupBy),
-        messages: [...c.messages, _msg(meId, MessageType.text, 'Saya ambil ya.'), _msg('system', MessageType.system, system)],
+        offer: Offer(id: 'o_$id', listingId: listingId, receiverId: meId, amount: l.price, status: OfferStatus.accepted, delivery: drop),
+        pickup: Pickup(id: 'pk_$id', deadline: l.pickupBy, held: 1),
+        messages: [
+          ...c.messages,
+          _msg(meId, MessageType.text, drop == null ? 'Saya ambil ya.' : 'Saya minta diantar ke ${drop.address} ya.'),
+          _msg('system', MessageType.system, system),
+        ],
       ),
     );
-    _counterpartSays(id, 'Siap, silakan ambil sebelum ${formatTime(l.pickupBy)} ya.');
+    ref.read(fypEventsProvider)(l, FypEvent.addtocart);
+    final by = formatTime(l.pickupBy);
+    _counterpartSays(id, drop == null ? 'Siap, silakan ambil sebelum $by ya.' : 'Siap, saya antar sebelum $by ya.');
     return id;
   }
 
-  /// Agreed price of the thread (offer amount, or the listed price).
-  int amountOf(Conversation c) => c.offer?.amount ?? _listing(c.listingId).price;
+  /// What the thread comes to: the agreed price per porsi times the portions, or the listed price.
+  /// Food only: a voucher and the free-food points look at this, never at the delivery fee.
+  int amountOf(Conversation c) => c.offer?.total ?? _listing(c.listingId).price;
+
+  /// What the receiver owes before a voucher: the food plus the delivery fee, if any.
+  int totalOf(Conversation c) => amountOf(c) + (c.offer?.deliveryFee ?? 0);
 
   /// "Pakai tunai di tempat" / "Bayar RpX" on B10d-B10e.
   void choosePayment(String id, PayMethod method) {
@@ -221,6 +264,11 @@ class ChatNotifier extends Notifier<List<Conversation>> {
     final v = ref.read(myVouchersProvider.notifier).byCode(code);
     if (v == null) return 'Kode tidak ditemukan.';
     if (v.used) return 'Voucher sudah dipakai.';
+    // One voucher per payment: another open reservation that is still waiting to pay may already hold it.
+    for (final o in state) {
+      final op = o.pickup;
+      if (o.id != id && op != null && op.open && op.voucherCode == v.code && op.payMethod == null && !op.paid) return 'Voucher sedang dipakai di reservasi lain.';
+    }
     if (!v.validUntil.isAfter(_now)) return 'Voucher sudah kedaluwarsa.';
     if (!v.reward.isFoodVoucher) return 'Voucher ini untuk mitra, tidak berlaku untuk makanan.';
     final off = math.min(v.reward.foodDiscount, price - minPayable);
@@ -256,7 +304,7 @@ class ChatNotifier extends Notifier<List<Conversation>> {
       id,
       (c) => c.copyWith(
         pickup: p.copyWith(statusChecks: p.statusChecks + 1, paidAt: _now, payMethod: PayMethod.qris),
-        messages: [...c.messages, _msg('system', MessageType.system, 'Pembayaran ${formatRupiah(amountOf(c) - p.discount)} via QRIS berhasil.')],
+        messages: [...c.messages, _msg('system', MessageType.system, 'Pembayaran ${formatRupiah(totalOf(c) - p.discount)} via QRIS berhasil.')],
       ),
     );
     _spendVoucher(p);
@@ -273,10 +321,11 @@ class ChatNotifier extends Notifier<List<Conversation>> {
     _update(
       id,
       (c) => c.copyWith(
-        pickup: p.copyWith(status: PickupStatus.expired),
+        pickup: p.copyWith(status: PickupStatus.expired, held: 0),
         messages: [...c.messages, _msg('system', MessageType.system, 'Reservasi kedaluwarsa.')],
       ),
     );
+    ref.read(listingsProvider.notifier).release(c!.listingId, p.held);
     return true;
   }
 
@@ -290,9 +339,10 @@ class ChatNotifier extends Notifier<List<Conversation>> {
     if (!c.pickup!.open) return ScanOutcome.invalid;
     final portions = c.offer?.portions ?? 1;
     final people = ref.read(peopleProvider);
+    final receiver = people[c.receiverId];
     final line = c.receiverId == meId
         ? 'QR dipindai. Makanan diambil dari ${people[c.providerId]?.name ?? 'penyedia'}.'
-        : 'Makanan diambil ${people[c.receiverId]?.name.split(' ').first ?? 'penerima'}.';
+        : 'Makanan diambil ${receiver == null ? 'penerima' : firstName(receiver.name)}.';
     _update(
       id,
       (c) => c.copyWith(
@@ -300,10 +350,12 @@ class ChatNotifier extends Notifier<List<Conversation>> {
         messages: [...c.messages, _msg('system', MessageType.system, line)],
       ),
     );
-    ref.read(listingsProvider.notifier).consume(c.listingId, portions);
+    // A reservation made in the app already took its portions out; only seeded demo threads still need it here.
+    if (c.pickup!.held == 0) ref.read(listingsProvider.notifier).consume(c.listingId, portions);
     final session = ref.read(sessionProvider.notifier);
     if (c.receiverId == meId) {
       session.addSaved(portions);
+      ref.read(fypEventsProvider)(_listing(c.listingId), FypEvent.transaction);
     } else {
       session.addShared(portions);
       session.addPoints(pickupPoints(portions: portions, isFree: amountOf(c) == 0));
@@ -344,11 +396,15 @@ class ReservationInfo {
   final Person receiver;
 
   Pickup get pickup => conv.pickup!;
-  int get amount => conv.offer?.amount ?? listing.price;
+  /// The food (agreed price per porsi × portions). The delivery fee comes on top; [total] is both.
+  int get amount => conv.offer?.total ?? listing.price;
+  Delivery? get delivery => conv.offer?.delivery;
+  int get deliveryFee => conv.offer?.deliveryFee ?? 0;
+  int get total => amount + deliveryFee;
 
-  /// Rupiah the food voucher takes off, and what the receiver really pays ([amount] minus the voucher).
+  /// Rupiah the food voucher takes off, and what the receiver really pays ([total] minus the voucher).
   int get discount => pickup.discount;
-  int get payable => amount - discount;
+  int get payable => total - discount;
   int get portions => conv.offer?.portions ?? 1;
   bool get asReceiver => conv.receiverId == meId;
 }

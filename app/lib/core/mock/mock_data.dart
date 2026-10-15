@@ -1,12 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/app_user.dart';
 import '../models/conversation.dart';
 import '../models/enums.dart';
 import '../models/listing.dart';
 import '../models/person.dart';
+import '../models/recipe.dart';
 import '../models/reward.dart';
 import '../services/formatters.dart';
 
@@ -15,13 +17,16 @@ const meId = 'me';
 
 /// Everything the MVP needs in place of a backend. Loaded from assets/mock/*.json at startup.
 class MockData {
-  const MockData({required this.user, required this.people, required this.listings, required this.conversations, required this.rewards});
+  const MockData({required this.user, required this.people, required this.listings, required this.conversations, required this.rewards, this.recipes = const []});
 
   final AppUser user;
   final Map<String, Person> people;
   final List<Listing> listings;
   final List<Conversation> conversations;
   final List<Reward> rewards;
+
+  /// Local recipe library for fresh ingredients ("Ide resep").
+  final List<Recipe> recipes;
 
   static Future<MockData> load(AssetBundle bundle, {DateTime? now}) async {
     Future<dynamic> read(String name) async => json.decode(await bundle.loadString('assets/mock/$name.json'));
@@ -31,6 +36,7 @@ class MockData {
       listings: await read('listings') as List<dynamic>,
       conversations: await read('conversations') as List<dynamic>,
       rewards: await read('rewards') as List<dynamic>,
+      recipes: await read('recipes') as List<dynamic>,
       now: now ?? DateTime.now(),
     );
   }
@@ -42,11 +48,15 @@ class MockData {
     required List<dynamic> listings,
     required List<dynamic> conversations,
     required List<dynamic> rewards,
+    List<dynamic> recipes = const [],
     required DateTime now,
   }) {
     final peopleMap = {for (final p in people) (p as Map<String, dynamic>)['id'] as String: Person.fromJson(p)};
+    final recipeList = [for (final r in recipes.cast<Map<String, dynamic>>()) Recipe.fromJson(r)];
+    final recipeById = {for (final r in recipeList) r.id: r};
     final listingList = [
-      for (final l in listings.cast<Map<String, dynamic>>()) Listing.fromJson(l, peopleMap[l['providerId']]!, now, ownerId: meId),
+      for (final l in listings.cast<Map<String, dynamic>>())
+        Listing.fromJson(l, peopleMap[l['providerId']]!, now, ownerId: meId, recipe: l['recipeId'] == null ? null : recipeById[l['recipeId']]!),
     ];
     final byId = {for (final l in listingList) l.id: l};
 
@@ -63,6 +73,8 @@ class MockData {
           );
       final o = c['offer'] as Map<String, dynamic>?;
       final p = c['pickup'] as Map<String, dynamic>?;
+      // "Minta diantar": the address comes from the JSON, the fee from the listing (as in the app).
+      final d = o?['delivery'] as Map<String, dynamic>?;
       return Conversation(
         id: id,
         listingId: listing.id,
@@ -80,6 +92,13 @@ class MockData {
                 amount: (o['amount'] as num).toInt(),
                 portions: (o['portions'] as num?)?.toInt() ?? 1,
                 status: OfferStatus.values.firstWhere((s) => s.name == o['status']),
+                delivery: d == null
+                    ? null
+                    : Delivery(
+                        address: d['address'] as String,
+                        position: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
+                        fee: listing.deliveryFee ?? 0,
+                      ),
               ),
         pickup: p == null
             ? null
@@ -98,6 +117,7 @@ class MockData {
       listings: listingList,
       conversations: [for (final c in conversations.cast<Map<String, dynamic>>()) conv(c)],
       rewards: [for (final r in rewards.cast<Map<String, dynamic>>()) Reward.fromJson(r)],
+      recipes: recipeList,
     );
   }
 }

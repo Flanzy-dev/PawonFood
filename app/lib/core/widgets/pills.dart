@@ -100,6 +100,24 @@ class TierTag extends InfoTag {
   TierTag(Tier tier, {super.key, super.height, super.size}) : super(tier.label);
 }
 
+/// "Bisa diantar" on a food card, next to the tier tag. An icon only: a text tag does not fit the card's text column at
+/// 360 dp. Screen readers hear the full label; the "Bisa diantar" filter and the detail spell it out.
+class DeliveryTag extends StatelessWidget {
+  const DeliveryTag({super.key});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: 'Bisa diantar',
+        child: Container(
+          height: 24,
+          width: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: AppColors.successTint, borderRadius: BorderRadius.circular(8)),
+          child: const Icon(LucideIcons.bike, size: 14, color: AppColors.primary),
+        ),
+      );
+}
+
 class DistancePill extends StatelessWidget {
   const DistancePill(this.meters, {super.key});
 

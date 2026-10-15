@@ -63,6 +63,7 @@ class ValidationResult {
     this.imageQuality,
     this.visibleSigns = const [],
     this.warnings = const [],
+    this.suggestedHealthTags = const {},
   });
 
   final AiVerdict verdict;
@@ -86,14 +87,38 @@ class ValidationResult {
   final List<String> visibleSigns;
   final List<String> warnings;
 
+  /// "Pilihan sehat" tags the AI could see (pre-selected in the share form; the provider confirms them).
+  final Set<HealthTag> suggestedHealthTags;
+
   bool get approved => verdict == AiVerdict.approved;
 
   /// Whether the share form may publish with this result (manual review still publishes, as before).
   bool get eligible => verdict == AiVerdict.approved || verdict == AiVerdict.pendingReview;
 }
 
+/// What the cloud model may report in `health_signals` (visible composition and cooking method only).
+enum HealthSignal {
+  sayurBuah('sayur_buah'),
+  protein('protein'),
+  digoreng('digoreng'),
+  direbusKukus('direbus_kukus');
+
+  const HealthSignal(this.key);
+  final String key;
+
+  static HealthSignal? tryKey(Object? key) => values.where((v) => v.key == key).firstOrNull;
+}
+
+/// Maps what the model saw to the provider's tags. "Tidak digoreng" needs boiled/steamed and nothing fried;
+/// "Rendah gula" cannot be seen in a photo, so it is never suggested.
+Set<HealthTag> healthTagsFromSignals(Set<HealthSignal> signals) => {
+      if (signals.contains(HealthSignal.sayurBuah)) HealthTag.sayurBuah,
+      if (signals.contains(HealthSignal.protein)) HealthTag.protein,
+      if (signals.contains(HealthSignal.direbusKukus) && !signals.contains(HealthSignal.digoreng)) HealthTag.tidakDigoreng,
+    };
+
 /// Why a photo could not be checked. The photo is then never treated as validated.
-enum ValidationFailure { network, timeout, rateLimited, uploadRejected, badResponse }
+enum ValidationFailure { network, timeout, rateLimited, uploadRejected, badResponse, serverError }
 
 class ValidationUnavailable implements Exception {
   const ValidationUnavailable(this.failure);
@@ -188,7 +213,12 @@ class SimulatedFoodValidator implements FoodValidator {
       message: r.message,
       confidence: r.confidence,
       detections: r.detections,
-      suggestedName: r.verdict == AiVerdict.rejected ? null : (m == DemoAiMode.rawIngredients ? 'Sayur mentah' : 'Ayam goreng'),
+      suggestedName: r.verdict == AiVerdict.rejected ? null : (m == DemoAiMode.rawIngredients ? 'Wortel dan kol' : 'Ayam goreng'),
+      suggestedHealthTags: switch (m) {
+        _ when r.verdict == AiVerdict.rejected => const {},
+        DemoAiMode.rawIngredients => const {HealthTag.sayurBuah, HealthTag.tidakDigoreng},
+        _ => const {HealthTag.protein},
+      },
     );
   }
 }

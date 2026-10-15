@@ -199,21 +199,25 @@ void main() {
   group('food label', () {
     final all = loadMockData().listings;
     final ayam = all.firstWhere((l) => l.id == 'l_ayam'); // Pawon Hero provider, cooked 30 min ago, 2 portions
-    final lodeh = all.firstWhere((l) => l.id == 'l_lodeh'); // Pawon Friend provider, cooked 45 min ago
+    final lodeh = all.firstWhere((l) => l.id == 'l_lodeh'); // Pawon Friend provider, cooked 45 min ago, sayur + protein + tidak digoreng
     final sayur = all.firstWhere((l) => l.id == 'l_sayur'); // raw ingredients, never cooked
+    final nasiTelur = all.firstWhere((l) => l.id == 'l_nasitelur'); // Pawon Elite provider, cooked 20 min ago, protein only
+    final roti = all.firstWhere((l) => l.id == 'l_roti'); // sealed, no tags
 
     test('a top-tier provider is Populer', () => expect(foodLabelFor(ayam, fixedNow), FoodLabel.populer));
-    test('freshly cooked food is Terbaru', () => expect(foodLabelFor(lodeh, fixedNow), FoodLabel.terbaru));
+    test('freshly cooked food is Terbaru', () => expect(foodLabelFor(nasiTelur, fixedNow), FoodLabel.terbaru));
+    test('food the provider tagged as healthy is Sehat', () => expect(foodLabelFor(lodeh, fixedNow), FoodLabel.sehat));
+    test('fresh raw ingredients are Segar, even when tagged healthy', () => expect(foodLabelFor(sayur, fixedNow), FoodLabel.segar));
     test('no label when old or never cooked', () {
-      expect(foodLabelFor(lodeh, fixedNow.add(const Duration(minutes: 30)))?.label, isNull); // 75 min after cooking
-      expect(foodLabelFor(sayur, fixedNow), isNull);
+      expect(foodLabelFor(nasiTelur, fixedNow.add(const Duration(minutes: 60)))?.label, isNull); // 80 min after cooking
+      expect(foodLabelFor(roti, fixedNow), isNull);
     });
     test('one portion left wins over every other label', () {
       expect(foodLabelFor(ayam.copyWith(portionsLeft: 1), fixedNow), FoodLabel.hampirHabis);
       expect(foodLabelFor(lodeh.copyWith(portionsLeft: 1), fixedNow), FoodLabel.hampirHabis);
     });
     test('labels read as in the design', () {
-      expect([for (final l in FoodLabel.values) l.label], ['Hampir habis', 'Populer', 'Terbaru']);
+      expect([for (final l in FoodLabel.values) l.label], ['Hampir habis', 'Segar', 'Sehat', 'Populer', 'Terbaru']);
     });
   });
 }

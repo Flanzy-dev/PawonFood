@@ -113,6 +113,7 @@ multipart. The image is held in memory for the request only. It is never written
   "visible_signs": [],
   "image_quality": "good",
   "warnings": [],
+  "health_signals": ["protein", "digoreng"],
   "listing_eligible": true,
   "decision": "approved",
   "reason": "Foto lolos validasi"
@@ -126,8 +127,9 @@ multipart. The image is held in memory for the request only. It is never written
 | `image_quality` | `good`, `blurry`, `too_dark`, `obstructed`, `too_far` |
 | `decision` | `approved`, `pending_review`, `retake`, `rejected` |
 | `visible_signs`, `warnings` | Short Indonesian phrases, at most 8 of 80 characters each. Percentages and "safe to eat" claims are dropped. |
+| `health_signals` | Any of `sayur_buah`, `protein`, `digoreng`, `direbus_kukus`: what is visible, not a health rating. Unknown values are dropped, a missing field means none, and non-food always gets `[]`. The app turns them into pre-selected "Pilihan sehat" tags (`direbus_kukus` without `digoreng` → Tidak digoreng; Rendah gula is never suggested) |
 
-The model fills the first seven fields. `listing_eligible`, `decision` and `reason` come only from `src/rules.js`,
+The model fills the first eight fields. `listing_eligible`, `decision` and `reason` come only from `src/rules.js`,
 checked in this order:
 
 1. Not food (`is_food: false` or `bukan_makanan`) → `rejected`
@@ -149,6 +151,21 @@ Errors are `{"error": {"code", "message"}}` with a generic message. Provider sta
 The app treats every non-200 answer as "not checked" and offers *Coba lagi*. A failure never approves a photo.
 
 `GET /healthz` → `{"status":"ok"}`.
+
+### `POST /v1/recipe-ideas`
+
+Optional recipe ideas for fresh ingredients ("Minta ide dari AI" in the share form). Text only: no photo is sent.
+Send `Content-Type: application/json` with `{"ingredients": "wortel dan kol"}` (2 to 200 characters, at most 2 KB body).
+It uses the same `X-Pawon-Client` token and rate limit as the photo check.
+
+```json
+{ "recipes": [ { "title": "Sup Wortel Kol", "minutes": 25, "ingredients": ["2 buah wortel"], "steps": ["Didihkan air."] } ] }
+```
+
+The answer is validated like the photo check: at most 3 recipes, 12 lines of 160 characters, 1 to 180 minutes. A recipe
+with a health or safety claim ("menyembuhkan", "aman dikonsumsi", percentages) is dropped as a whole, so the list can
+be empty. Errors: `400` bad body, `413` too large, `415` not JSON, plus the codes in the table above. The fake
+provider (`QWEN_PROVIDER=fake`) always answers with one fixed recipe. The app falls back to its local library on any error.
 
 Logs are one JSON line per request: `req_id`, route, status, duration, upload size, pixel size, decision, error code.
 The API key and client token are masked in every line.

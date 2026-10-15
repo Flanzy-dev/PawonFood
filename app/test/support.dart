@@ -25,6 +25,7 @@ MockData loadMockData([DateTime? now]) {
     listings: read('listings') as List<dynamic>,
     conversations: read('conversations') as List<dynamic>,
     rewards: read('rewards') as List<dynamic>,
+    recipes: read('recipes') as List<dynamic>,
     now: now ?? fixedNow,
   );
 }

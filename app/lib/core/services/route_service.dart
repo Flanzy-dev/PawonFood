@@ -50,7 +50,7 @@ class OsrmFootPlanner implements RoutePlanner {
     try {
       final res = await _client.get(url, headers: {'User-Agent': 'PawonFood/1.0 (hackathon prototype)'}).timeout(timeout);
       if (res.statusCode != 200) return null;
-      return parseOsrmRoute(jsonDecode(utf8.decode(res.bodyBytes)));
+      return withEnds(parseOsrmRoute(jsonDecode(utf8.decode(res.bodyBytes))), from, to);
     } on Object {
       return null; // network, timeout or an answer that does not fit: the estimate takes over
     }
@@ -97,6 +97,31 @@ WalkRoute parseOsrmRoute(Object? json) {
   }
   return WalkRoute(path: path, meters: meters.toDouble(), steps: steps, fromStreets: true);
 }
+
+/// OSRM draws the route between the points it snapped to the nearest walkable ways, so the line can start and stop
+/// tens of metres from where the person and the pickup point really are. This joins the line to [from] and [to], so
+/// it touches both pins at any zoom. The extra legs count towards [WalkRoute.meters], and the steps move with them.
+WalkRoute withEnds(WalkRoute r, LatLng from, LatLng to) {
+  final head = _distance(from, r.path.first);
+  final tail = _distance(r.path.last, to);
+  final addHead = head > _endGap, addTail = tail > _endGap;
+  if (!addHead && !addTail) return r;
+  final path = [if (addHead) from, ...r.path, if (addTail) to];
+  final shift = addHead ? head : 0.0;
+  final end = pathLength(path);
+  final steps = [
+    for (final s in r.steps)
+      switch (s.turn) {
+        TurnKind.depart => RouteStep(startsAt: s.startsAt, length: s.length + shift, turn: s.turn, instruction: s.instruction),
+        TurnKind.arrive => RouteStep(startsAt: end, length: s.length, turn: s.turn, instruction: s.instruction),
+        _ => RouteStep(startsAt: s.startsAt + shift, length: s.length, turn: s.turn, instruction: s.instruction),
+      },
+  ];
+  return WalkRoute(path: path, meters: r.meters + (addHead ? head : 0) + (addTail ? tail : 0), steps: steps, fromStreets: r.fromStreets);
+}
+
+/// Gaps up to this many metres are GPS noise or rounding, not a snapped end worth drawing.
+const _endGap = 1.0;
 
 TurnKind turnKind(String type, String? modifier) {
   if (type == 'depart') return TurnKind.depart;

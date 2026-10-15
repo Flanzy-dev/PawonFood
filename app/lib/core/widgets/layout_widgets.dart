@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../motion/motion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'app_button.dart';
 import 'top_bar.dart';
 
-/// Section heading with an optional trailing action ("Segera habis di sekitarmu" ... "Semua").
+/// Section heading with an optional trailing action ("Pilihan untukmu di sekitar" ... "Semua").
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.title, {super.key, this.actionLabel, this.onAction});
 
@@ -31,15 +32,37 @@ class SectionTitle extends StatelessWidget {
       );
 }
 
-/// Search field: white, rounded, search icon. Pass [value] to let the screen clear or set the text from outside (a
-/// "Hapus filter" button); typing keeps working through [onChanged].
+/// Search field: white, rounded, search icon, and an ✕ at the right end while there is text ("Hapus pencarian").
+/// Pass [value] to let the screen clear or set the text from outside; typing keeps working through [onChanged].
 class SearchField extends StatefulWidget {
-  const SearchField({super.key, required this.hint, required this.onChanged, this.controller, this.value});
+  const SearchField({
+    super.key,
+    required this.hint,
+    required this.onChanged,
+    this.controller,
+    this.value,
+    this.onSubmitted,
+    this.onTap,
+    this.readOnly = false,
+    this.autofocus = false,
+    this.heroTag,
+  });
 
   final String hint;
   final ValueChanged<String> onChanged;
   final TextEditingController? controller;
   final String? value;
+
+  /// Keyboard "search" action.
+  final ValueChanged<String>? onSubmitted;
+
+  /// With [readOnly] the field is a button that opens a search page (Beranda); the ✕ still clears the text.
+  final VoidCallback? onTap;
+  final bool readOnly;
+  final bool autofocus;
+
+  /// Shares the field between two routes: it flies from one position to the other (off when motion is reduced).
+  final Object? heroTag;
 
   @override
   State<SearchField> createState() => _SearchFieldState();
@@ -56,6 +79,11 @@ class _SearchFieldState extends State<SearchField> {
     if (v != null && v != _c.text) _c.text = v;
   }
 
+  void _clear() {
+    _c.clear();
+    widget.onChanged('');
+  }
+
   @override
   void dispose() {
     _own.dispose();
@@ -63,27 +91,85 @@ class _SearchFieldState extends State<SearchField> {
   }
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        // 52 at normal text size; taller when the system font is larger, so the typed text isn't clipped.
-        height: math.max(52, 28 + 24 * textScaleOf(context)),
-        child: TextField(
-          controller: _c,
-          onChanged: widget.onChanged,
-          textInputAction: TextInputAction.search,
-          style: AppTypography.text(16),
-          cursorColor: AppColors.primary,
-          decoration: InputDecoration(
-            hintText: widget.hint,
-            hintStyle: AppTypography.text(16, color: AppColors.inkMuted),
-            prefixIcon: const Icon(LucideIcons.search, size: 22, color: AppColors.inkMuted),
-            filled: true,
-            fillColor: AppColors.surface,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+  Widget build(BuildContext context) {
+    final field = SizedBox(
+      // 52 at normal text size; taller when the system font is larger, so the typed text isn't clipped.
+      height: math.max(52, 28 + 24 * textScaleOf(context)),
+      child: TextField(
+        controller: _c,
+        onChanged: widget.onChanged,
+        onSubmitted: widget.onSubmitted,
+        onTap: widget.onTap,
+        readOnly: widget.readOnly,
+        // A button-like field must not keep a caret when the search page closes again.
+        canRequestFocus: !widget.readOnly,
+        autofocus: widget.autofocus,
+        textInputAction: TextInputAction.search,
+        style: AppTypography.text(16),
+        cursorColor: AppColors.primary,
+        decoration: InputDecoration(
+          hintText: widget.hint,
+          hintStyle: AppTypography.text(16, color: AppColors.inkMuted),
+          prefixIcon: const Icon(LucideIcons.search, size: 22, color: AppColors.inkMuted),
+          // Rebuilt by the controller, so the ✕ shows as soon as there is something to clear.
+          suffixIcon: ListenableBuilder(
+            listenable: _c,
+            builder: (_, _) => _c.text.isEmpty
+                ? const SizedBox.shrink()
+                : IconButton(icon: const Icon(LucideIcons.x, size: 20, color: AppColors.inkMuted), tooltip: 'Hapus pencarian', onPressed: _clear),
           ),
+          filled: true,
+          fillColor: AppColors.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.border)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
         ),
-      );
+      ),
+    );
+    final tag = widget.heroTag;
+    if (tag == null) return field;
+    return HeroMode(
+      enabled: !Motion.reduced(context),
+      child: Hero(
+        tag: tag,
+        // A look-alike instead of a second live TextField, so the flight never fights over focus or the controller.
+        flightShuttleBuilder: (_, _, _, _, _) => _SearchShuttle(text: _c.text, hint: widget.hint),
+        child: field,
+      ),
+    );
+  }
+}
+
+/// The search field as drawn during a [Hero] flight: same look, no editing.
+class _SearchShuttle extends StatelessWidget {
+  const _SearchShuttle({required this.text, required this.hint});
+
+  final String text;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
+    child: DecoratedBox(
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          const Icon(LucideIcons.search, size: 22, color: AppColors.inkMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text.isEmpty ? hint : text,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              softWrap: false,
+              style: AppTypography.text(16, color: text.isEmpty ? AppColors.inkMuted : AppColors.ink),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Centered illustration + title + body + actions (empty states and permission screens).

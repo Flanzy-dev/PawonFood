@@ -18,7 +18,9 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/form_controls.dart';
 import '../../core/widgets/info_box.dart';
 import '../../core/widgets/navigation_widgets.dart';
+import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/pawon_map.dart';
+import '../../core/widgets/term_row.dart';
 
 /// C15d "Pilih lokasi di peta": drag the map under a fixed pin (it lifts while dragging and drops on release),
 /// or search a place. Returns the picked [PickupPoint] (for this listing only); "Simpan ke titik tersimpan" also
@@ -110,6 +112,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
       final saved = ref.read(pickupPointsProvider.notifier).save(point);
       point = PickupPoint(id: saved.id, name: saved.name, address: saved.address, position: saved.position, fromMap: true);
     }
+    ref.read(recentPlacesProvider.notifier).add(point);
     context.pop(point);
   }
 
@@ -120,10 +123,22 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
     final area = nearbyAreaName(_center);
     final top = MediaQuery.paddingOf(context).top;
     final query = _search.text.trim().toLowerCase();
-    final results = query.isEmpty ? searchablePlaces : [for (final p in searchablePlaces) if ('${p.name} ${p.address}'.toLowerCase().contains(query)) p];
+    final recent = ref.watch(recentPlacesProvider);
+    // Typed: one list from the history and the known places (a place in both shows once, as history).
+    final results = [
+      for (final p in [...recent, ...searchablePlaces.where((s) => !recent.any((r) => r.name == s.name))])
+        if ('${p.name} ${p.address}'.toLowerCase().contains(query)) p,
+    ];
+    final searching = _searchFocus.hasFocus;
     final tiles = ref.watch(tilesEnabledProvider);
 
-    return Scaffold(
+    // System back while searching closes the suggestions instead of leaving the screen.
+    return PopScope(
+      canPop: !searching,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _searchFocus.unfocus();
+      },
+      child: Scaffold(
       backgroundColor: AppColors.mapSand,
       body: Column(
         children: [
@@ -132,7 +147,10 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
               children: [
                 Positioned.fill(
                   child: Listener(
-                    onPointerDown: (_) => setState(() => _dragging = true),
+                    onPointerDown: (_) {
+                      _searchFocus.unfocus(); // touching the map closes the suggestions
+                      setState(() => _dragging = true);
+                    },
                     onPointerUp: (_) => setState(() => _dragging = false),
                     onPointerCancel: (_) => setState(() => _dragging = false),
                     child: FlutterMap(
@@ -161,20 +179,30 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                         const MapLabel('Titik ambil', outlined: true),
                         const SizedBox(height: 6),
                         SvgPicture.string(teardropSvg('#2F5D39', scale: 1.4), semanticsLabel: 'Pin titik ambil'),
-                        // Lift the tip so it, not the box centre, marks the spot.
-                        const SizedBox(height: 74),
+                        // Lift the tip so it, not the box centre, marks the spot: this equals everything above it
+                        // (label 28 + gap 6 + pin 36 x 1.4), which puts the tip exactly on the saved map centre.
+                        const SizedBox(height: 28 + 6 + 36 * 1.4),
                       ]),
                     ),
                   ),
                 ),
+                // Searching: a white page covers the map, like the Beranda search. The bar stays where it is.
+                if (searching) const Positioned.fill(child: FadeSlideIn(offset: 0, duration: Motion.base, child: ColoredBox(color: AppColors.surface))),
                 Positioned(
                   top: top + 8,
                   left: 16,
                   right: 16,
+                  bottom: searching ? 0 : null,
                   child: Column(
+                    mainAxisSize: searching ? MainAxisSize.max : MainAxisSize.min,
                     children: [
                       Row(children: [
-                        RoundIconButton(icon: LucideIcons.arrowLeft, semanticLabel: 'Kembali', shadow: true, onTap: () => context.pop()),
+                        RoundIconButton(
+                          icon: LucideIcons.arrowLeft,
+                          semanticLabel: 'Kembali',
+                          shadow: true,
+                          onTap: () => searching ? _searchFocus.unfocus() : context.pop(), // back first closes the search
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Container(
@@ -193,6 +221,13 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                               decoration: InputDecoration(
                                 border: InputBorder.none,
                                 prefixIcon: const Icon(LucideIcons.search, color: AppColors.inkMuted),
+                                suffixIcon: _search.text.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        icon: const Icon(LucideIcons.x, size: 20, color: AppColors.inkMuted),
+                                        tooltip: 'Hapus pencarian',
+                                        onPressed: () => setState(_search.clear),
+                                      ),
                                 hintText: 'Cari alamat atau tempat',
                                 hintStyle: AppTypography.text(16, color: AppColors.inkMuted),
                                 contentPadding: const EdgeInsets.symmetric(vertical: 15),
@@ -201,47 +236,31 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                           ),
                         ),
                       ]),
-                      AnimatedSize(
-                        duration: Motion.of(context, Motion.base),
-                        curve: Motion.move,
-                        child: _searchFocus.hasFocus && results.isNotEmpty
-                            ? Container(
-                                margin: const EdgeInsets.only(top: 8, left: 56),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 8, offset: Offset(0, 2))],
-                                ),
-                                child: Column(children: [
-                                  for (final p in results)
-                                    ListTile(
-                                      minTileHeight: 52,
-                                      leading: const Icon(LucideIcons.mapPin, color: AppColors.primary),
-                                      title: Text(p.name, style: AppTypography.text(15, weight: 600)),
-                                      subtitle: Text(p.address, style: AppTypography.text(13, color: AppColors.inkMuted)),
-                                      onTap: () {
-                                        _search.text = p.name;
-                                        _searchFocus.unfocus();
-                                        _goTo(p.position);
-                                      },
-                                    ),
-                                ]),
-                              )
-                            : const SizedBox(width: double.infinity),
-                      ),
+                      if (searching)
+                        Expanded(
+                          child: EntranceScope(
+                            child: ListView(
+                              padding: EdgeInsets.only(top: 12, bottom: MediaQuery.paddingOf(context).bottom + 16),
+                              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+                              children: query.isNotEmpty ? _matches(results, recent) : _suggestions(recent),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                Positioned(
-                  right: 16,
-                  bottom: 24,
-                  child: RoundIconButton(icon: LucideIcons.navigation, semanticLabel: 'Ke lokasi saya', size: 52, shadow: true, onTap: _locating ? null : () => _locate(report: true)),
-                ),
+                if (!searching)
+                  Positioned(
+                    right: 16,
+                    bottom: 24,
+                    child: RoundIconButton(icon: LucideIcons.navigation, semanticLabel: 'Ke lokasi saya', size: 52, shadow: true, onTap: _locating ? null : () => _locate(report: true)),
+                  ),
               ],
             ),
           ),
           // The panel scrolls and is capped, so the name field and the confirm button stay reachable with the keyboard open.
-          ConstrainedBox(
+          // While searching it steps aside, so the suggestions get the whole screen above the keyboard.
+          if (!searching) ConstrainedBox(
             constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.55),
             child: Container(
               padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.paddingOf(context).bottom),
@@ -294,6 +313,66 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
           ),
         ],
       ),
+      ),
     );
+  }
+
+  /// A suggestion was picked: the map moves there, it goes on top of "Riwayat" and the search closes.
+  void _pick(PickupPoint p) {
+    _search.text = p.name;
+    _searchFocus.unfocus();
+    ref.read(recentPlacesProvider.notifier).add(p);
+    _goTo(p.position);
+  }
+
+  TermRow _row(PickupPoint p, IconData icon, {VoidCallback? onRemove}) =>
+      TermRow(icon: icon, label: p.name, subtitle: p.address, onTap: () => _pick(p), onRemove: onRemove);
+
+  /// Empty bar: "Riwayat" (with ✕ per row and "Hapus semua") and "Rekomendasi".
+  List<Widget> _suggestions(List<PickupPoint> recent) {
+    final recents = ref.read(recentPlacesProvider.notifier);
+    return [
+      if (recent.isNotEmpty)
+        FadeSlideIn(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionTitle('Riwayat', actionLabel: 'Hapus semua', onAction: recents.clear),
+              for (final p in recent) _row(p, LucideIcons.history, onRemove: () => recents.remove(p)),
+            ],
+          ),
+        ),
+      FadeSlideIn(
+        index: 1,
+        child: Padding(
+          padding: EdgeInsets.only(top: recent.isEmpty ? 0 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionTitle('Rekomendasi'),
+              for (final p in searchablePlaces)
+                if (!recent.any((r) => r.name == p.name)) _row(p, LucideIcons.mapPin), // already in Riwayat
+            ],
+          ),
+        ),
+      ),
+    ];
+  }
+
+  /// Typed text: one list from the history and the known places (a place in both shows once, as history).
+  List<Widget> _matches(List<PickupPoint> results, List<PickupPoint> recent) {
+    if (results.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: Column(children: [
+            Text('Tidak ada tempat yang cocok', style: AppTypography.text(16, weight: 600)),
+            const SizedBox(height: 4),
+            Text('Coba nama jalan atau tempat lain, atau geser peta.', textAlign: TextAlign.center, style: AppTypography.bodyMuted),
+          ]),
+        ),
+      ];
+    }
+    return [for (final p in results) _row(p, recent.contains(p) ? LucideIcons.history : LucideIcons.mapPin)];
   }
 }

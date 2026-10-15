@@ -83,7 +83,7 @@ class _ThreadRow extends ConsumerWidget {
     final other = people[asReceiver ? c.providerId : c.receiverId];
     if (listing == null || other == null) return const SizedBox.shrink();
     final now = ref.watch(clockProvider)();
-    final amount = c.offer?.status == OfferStatus.accepted ? c.offer!.amount : listing.price;
+    final amount = c.offer?.status == OfferStatus.accepted ? c.offer!.total : listing.price;
     final price = amount == 0 ? 'Gratis' : formatRupiah(amount);
     final last = c.lastChat;
     final unread = c.unread > 0;

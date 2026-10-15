@@ -66,7 +66,8 @@ class CloudFoodValidator implements FoodValidator {
       case 502:
         throw const ValidationUnavailable(ValidationFailure.badResponse);
       default:
-        throw const ValidationUnavailable(ValidationFailure.network);
+        // The server answered (401, 500, 503...), so the connection is fine: do not tell the user to check it.
+        throw const ValidationUnavailable(ValidationFailure.serverError);
     }
     try {
       return parseCloudValidation(jsonDecode(utf8.decode(res.bodyBytes)));
@@ -115,6 +116,12 @@ ValidationResult parseCloudValidation(Object? json) {
   final foodName = name is String ? name.trim() : '';
   final reason = field<String>('reason').trim();
 
+  // Optional: servers from before this field send none, which simply suggests no tags.
+  final signals = json['health_signals'];
+  if (signals != null && (signals is! List || signals.any((e) => e is! String))) {
+    throw const FormatException('health_signals has the wrong type');
+  }
+
   return ValidationResult(
     verdict: verdict,
     category: category,
@@ -124,5 +131,6 @@ ValidationResult parseCloudValidation(Object? json) {
     imageQuality: quality,
     visibleSigns: notes('visible_signs'),
     warnings: notes('warnings'),
+    suggestedHealthTags: eligible && signals is List ? healthTagsFromSignals({for (final k in signals) ?HealthSignal.tryKey(k)}) : const {},
   );
 }

@@ -39,7 +39,7 @@ final historyProvider = Provider.family<List<HistoryEntry>, bool>((ref, taking) 
     if ((c.receiverId == meId) != taking) continue;
     final l = byId(c.listingId);
     if (l == null) continue;
-    final amount = c.offer?.amount ?? l.price;
+    final amount = c.offer?.total ?? l.price;
     final done = p.status == PickupStatus.pickedUp;
     live.add(HistoryEntry(
       listing: l,

@@ -8,8 +8,9 @@ import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/settings_list.dart';
 import '../../core/widgets/top_bar.dart';
 
-/// Support address shown in Pusat bantuan. The team still has to fill it in (Figma placeholder).
-const supportEmail = '[EMAIL TIM]';
+/// Support address shown in Pusat bantuan. The team still has to pick one: set it with
+/// `--dart-define=PAWON_SUPPORT_EMAIL=...`, otherwise the Figma placeholder shows.
+const supportEmail = String.fromEnvironment('PAWON_SUPPORT_EMAIL', defaultValue: '[EMAIL TIM]');
 
 /// "Terakhir diperbarui" on the legal pages.
 const legalUpdated = '7 Oktober 2026';
@@ -18,6 +19,7 @@ const _faq = [
   ('Cara membagikan makanan', 'Ketuk tombol Bagikan, foto makanan langsung dengan kamera, cek isian yang sudah diisi AI, lalu ketuk "Bagikan sekarang".'),
   ('Cara menawar dan mengambil', 'Buka makanan, pilih "Tawar cepat" atau "Tulis sendiri". Setelah tawaran diterima, porsi direservasi sampai batas waktu ambil.'),
   ('Cara memindai QR ambil', 'Di titik ambil, minta penyedia membuka QR ambil, lalu ketuk "Pindai QR" di chat. QR hanya berlaku sampai batas waktu ambil.'),
+  ('Bisa minta diantar?', 'Bisa, kalau penyedia membuka opsi antar. Di halaman makanan, pilih "Minta diantar" sebelum ketuk Ambil. Alamatnya harus dalam 1 km, dan ongkirnya seluruhnya untuk penyedia. Pindai QR saat makanan sampai.'),
   ('Kenapa fotoku ditolak AI?', 'AI menolak foto yang bukan makanan, foto layar, atau foto yang terlalu gelap. Ambil foto ulang dengan cahaya cukup.'),
   ('Cara melapor makanan atau penyedia', 'Beri ulasan setelah mengambil. Ulasan buruk berulang membuat penyedia di-suspend dulu, lalu diblokir jika berlanjut.'),
 ];

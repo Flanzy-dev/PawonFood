@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/chat_repository.dart';
 import '../../core/data/listings_repository.dart';
+import '../../core/data/pickup_points_repository.dart';
 import '../../core/data/providers.dart';
 import '../../core/mock/mock_data.dart';
 import '../../core/models/conversation.dart';
@@ -26,6 +27,7 @@ import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/listing_summary.dart';
 import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/pills.dart';
+import '../listing/handover_choice.dart';
 import 'offer_sheet.dart';
 
 /// B10 Chat negosiasi: listing card, offer cards, bubbles, the reservation card (B10 / B10i / B10j) and the
@@ -69,10 +71,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _toBottom();
   }
 
+  /// "Tawar lagi": the sheet starts from the last offer's pickup or delivery choice.
   Future<void> _counterOffer(Listing l) async {
-    final draft = await showOfferSheet(context, listing: l);
+    final drop = ref.read(conversationProvider(widget.conversationId))?.offer?.delivery;
+    final address = drop == null ? ref.read(pickupPointsProvider.notifier).primary : pointOf(drop);
+    final draft = await showOfferSheet(context, listing: l, address: address, delivery: drop != null);
     if (draft == null || !mounted) return;
-    final error = ref.read(chatProvider.notifier).sendOffer(widget.conversationId, draft.amount, portions: draft.portions, message: draft.message);
+    final error = ref.read(chatProvider.notifier).sendOffer(widget.conversationId, draft.amount, portions: draft.portions, message: draft.message, delivery: draft.delivery);
     if (error != null) {
       showAppSnack(context, error);
     } else {
@@ -219,6 +224,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         AppChip(label: 'Saya OTW', selected: false, height: 44, onTap: () => _quick('Saya OTW')),
                         const SizedBox(width: 8),
                         AppChip(label: 'Masih ada?', selected: false, height: 44, onTap: () => _quick('Masih ada?')),
+                        const SizedBox(width: 8),
+                        AppChip(label: 'Bisa diantar?', selected: false, height: 44, onTap: () => _quick('Bisa diantar?')),
                         if (canCounter) ...[
                           const SizedBox(width: 8),
                           AppChip(label: 'Tawar lagi', selected: false, height: 44, accentWhenUnselected: true, onTap: () => _counterOffer(listing)),
@@ -281,6 +288,9 @@ class _MessageItem extends StatelessWidget {
     }
     final align = own ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final maxW = MediaQuery.sizeOf(context).width * 0.8;
+    // Everything after the amount: "1 porsi", or "1 porsi · diantar".
+    final cut = m.body.indexOf('· ');
+    final offerDetail = cut < 0 ? m.body : m.body.substring(cut + 2);
     final bubble = m.type == MessageType.offer
         ? Container(
             width: 252,
@@ -293,9 +303,9 @@ class _MessageItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(own ? 'Tawaran kamu' : 'Tawaran ${other.name.split(' ').first}', style: AppTypography.text(14, weight: 600, color: own ? AppColors.onGreenMuted : AppColors.inkMuted)),
+                Text(own ? 'Tawaran kamu' : 'Tawaran ${firstName(other.name)}', style: AppTypography.text(14, weight: 600, color: own ? AppColors.onGreenMuted : AppColors.inkMuted)),
                 Text(formatRupiah(m.amount ?? 0), style: AppTypography.display(36, height: 44, color: own ? AppColors.background : AppColors.ink)),
-                Text(m.body.contains('·') ? m.body.split('· ').last : m.body, style: AppTypography.text(13, color: own ? AppColors.onGreenMuted : AppColors.inkMuted)),
+                Text(offerDetail, style: AppTypography.text(13, color: own ? AppColors.onGreenMuted : AppColors.inkMuted)),
               ],
             ),
           )
@@ -372,13 +382,20 @@ class _ReservationCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pickup = conv.pickup!;
-    final amount = conv.offer?.amount ?? listing.price;
+    final unit = conv.offer?.amount ?? listing.price; // per porsi
+    final portions = conv.offer?.portions ?? 1;
+    final amount = unit * portions;
+    // "Minta diantar": the provider brings the food to [drop], and the fee comes on top of the food.
+    final drop = conv.offer?.delivery;
+    final total = amount + (drop?.fee ?? 0);
     final deadline = formatTime(pickup.deadline);
     final providerShort = shortName(asReceiver ? other.name : listing.provider.name);
-    final otherFirst = other.name.split(' ').first;
-    // What the receiver really pays: the agreed price minus a food voucher applied on Pembayaran.
-    final payable = amount - pickup.discount;
-    final claimedFull = amount == listing.price;    final acceptedTitle = amount == 0 ? 'Ambil gratis disetujui' : (claimedFull ? 'Ambil ${formatRupiah(amount)} disetujui' : 'Tawaran ${formatRupiah(amount)} diterima');
+    final otherFirst = firstName(other.name);
+    // What the receiver really pays: the agreed price plus the delivery fee, minus a food voucher applied on Pembayaran.
+    final payable = total - pickup.discount;
+    final claimedFull = unit == listing.price;
+    final portionsNote = portions > 1 ? ' · $portions porsi' : '';
+    final acceptedTitle = amount == 0 ? 'Ambil gratis disetujui' : (claimedFull ? 'Ambil ${formatRupiah(unit)} disetujui' : 'Tawaran ${formatRupiah(unit)} diterima$portionsNote');
 
     late final String title;
     late final String body;
@@ -399,31 +416,37 @@ class _ReservationCard extends ConsumerWidget {
       case PickupStatus.reserved:
         title = acceptedTitle;
         if (!asReceiver) {
-          final pay = amount == 0
+          final pay = total == 0
               ? ''
               : pickup.paid
                   ? ' Sudah dibayar ${formatRupiah(payable)} via QRIS.'
                   : pickup.payMethod == PayMethod.cash
                       ? ' Terima ${formatRupiah(payable)} tunai di tempat.'
                       : ' $otherFirst belum memilih cara bayar.';
-          body = 'Tunjukkan QR ke $otherFirst saat dia mengambil, sebelum $deadline.$pay';
+          body = drop == null
+              ? 'Tunjukkan QR ke $otherFirst saat dia mengambil, sebelum $deadline.$pay'
+              : 'Antar ke $otherFirst di ${drop.address} sebelum $deadline. Tunjukkan QR saat sampai.$pay';
           primary('Buka QR ambil', () => context.push('/qr/${conv.id}'), icon: LucideIcons.qrCode);
-        } else if (amount > 0 && pickup.payMethod == null) {
+          // The provider walks the food over: the same route screen, to the delivery address.
+          if (drop != null) outline('Lihat rute antar', () => context.push('/route/${conv.id}'), icon: LucideIcons.personStanding);
+        } else if (total > 0 && pickup.payMethod == null) {
+          // Free food with a delivery fee still has something to pay.
           body = 'Pilih cara bayar: tunai di tempat atau bayar di aplikasi. Reservasi aman sampai $deadline.';
-          outline('Lihat rute', () => context.push('/route/${conv.id}'), icon: LucideIcons.personStanding);
+          if (drop == null) outline('Lihat rute', () => context.push('/route/${conv.id}'), icon: LucideIcons.personStanding);
           primary('Pilih cara bayar', () => context.push('/pay/${conv.id}'));
         } else {
-          final scanLine = 'Pindai QR di HP $providerShort saat tiba, sebelum $deadline.';
+          final scanLine = drop == null ? 'Pindai QR di HP $providerShort saat tiba, sebelum $deadline.' : 'Pindai QR di HP $providerShort saat makanan sampai, sebelum $deadline.';
           if (pickup.paid) {
             tag = 'Lunas';
             body = 'Lunas ${formatRupiah(payable)} via QRIS. $scanLine';
-          } else if (amount == 0) {
+          } else if (total == 0) {
             body = 'Gratis. $scanLine';
           } else {
             body = 'Bayar ${formatRupiah(payable)} tunai di tempat. $scanLine';
           }
           primary('Pindai QR', () => context.push('/scan/${conv.id}'));
-          outline('Lihat rute', () => context.push('/route/${conv.id}'), icon: LucideIcons.personStanding);
+          // A delivery comes to the receiver: there is no walk to plan.
+          if (drop == null) outline('Lihat rute', () => context.push('/route/${conv.id}'), icon: LucideIcons.personStanding);
         }
     }
 
@@ -449,12 +472,12 @@ class _ReservationCard extends ConsumerWidget {
           ]),
           const SizedBox(height: 12),
           Text(body, style: AppTypography.text(15, height: 22)),
-          if (!done && !expired && asReceiver && pickup.payMethod != null || (!done && !expired && amount == 0 && asReceiver)) ...[
+          if (!done && !expired && asReceiver && pickup.payMethod != null || (!done && !expired && total == 0 && asReceiver)) ...[
             const SizedBox(height: 8),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Padding(padding: EdgeInsets.only(top: 2), child: Icon(LucideIcons.mapPin, size: 16, color: AppColors.primary)),
               const SizedBox(width: 6),
-              Expanded(child: Text('Titik ambil: ${listing.pickupPoint}', style: AppTypography.text(13, height: 18, color: AppColors.inkMuted))),
+              Expanded(child: Text(drop == null ? 'Titik ambil: ${listing.pickupPoint}' : 'Alamat antar: ${drop.address}', style: AppTypography.text(13, height: 18, color: AppColors.inkMuted))),
             ]),
           ],
           if (done && asReceiver && conv.review != null) ...[

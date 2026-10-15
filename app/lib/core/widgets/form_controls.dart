@@ -172,14 +172,22 @@ class _RoundButton extends StatelessWidget {
       );
 }
 
-/// Equal-width pickup deadline chips (19.00 / 20.30 / 22.00). Times that already passed are disabled.
+/// Equal-width pickup deadline chips (19.00 / 20.30 / 22.00). Times that already passed are disabled. With [onCustom]
+/// a fourth chip "Atur jam" lets the provider pick any time; once [custom] is set the chip shows that time and is
+/// selected while it is the chosen deadline. Tapping it always reopens the picker.
 class TimeChips extends StatelessWidget {
-  const TimeChips({super.key, required this.times, required this.selected, required this.now, required this.onSelected});
+  const TimeChips({super.key, required this.times, required this.selected, required this.now, required this.onSelected, this.onCustom, this.custom});
 
   final List<DateTime> times;
   final DateTime? selected;
   final DateTime now;
   final ValueChanged<DateTime> onSelected;
+
+  /// Opens the time picker; null hides the "Atur jam" chip.
+  final VoidCallback? onCustom;
+
+  /// The deadline the provider picked with "Atur jam", shown on the fourth chip.
+  final DateTime? custom;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -188,7 +196,25 @@ class TimeChips extends StatelessWidget {
             if (i > 0) const SizedBox(width: 8),
             Expanded(child: _chip(context, times[i])),
           ],
+          if (onCustom != null) ...[const SizedBox(width: 8), Expanded(child: _customChip(context))],
         ],
+      );
+
+  Widget _chipShell(BuildContext context, {required bool on, required bool enabled, required Color border, required VoidCallback? onTap, required Widget child}) => Pressable(
+        enabled: enabled,
+        child: AnimatedContainer(
+          duration: Motion.of(context, Motion.base),
+          curve: Motion.move,
+          decoration: ShapeDecoration(
+            color: on ? AppColors.primary : AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: on ? AppColors.primary : border, width: border == AppColors.primary && !on ? 1.5 : 1)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(onTap: onTap, child: Container(height: 52, alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: 6), child: FittedBox(fit: BoxFit.scaleDown, child: child))),
+          ),
+        ),
       );
 
   Widget _chip(BuildContext context, DateTime t) {
@@ -199,31 +225,37 @@ class TimeChips extends StatelessWidget {
       selected: on,
       enabled: enabled,
       label: 'Ambil paling lambat ${formatTime(t)}',
-      child: Pressable(
+      child: _chipShell(
+        context,
+        on: on,
         enabled: enabled,
-        child: AnimatedContainer(
-          duration: Motion.of(context, Motion.base),
-          curve: Motion.move,
-          decoration: ShapeDecoration(
-            color: on ? AppColors.primary : AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: on ? AppColors.primary : AppColors.border)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: enabled ? () => onSelected(t) : null,
-              child: Container(
-                height: 52,
-                alignment: Alignment.center,
-                child: Text(
-                  formatTime(t),
-                  style: AppTypography.text(16, weight: 700, color: on ? AppColors.background : (enabled ? AppColors.ink : AppColors.inkMuted.withValues(alpha: 0.5))),
-                ),
-              ),
-            ),
-          ),
-        ),
+        border: AppColors.border,
+        onTap: enabled ? () => onSelected(t) : null,
+        child: Text(formatTime(t), style: AppTypography.text(16, weight: 700, color: on ? AppColors.background : (enabled ? AppColors.ink : AppColors.inkMuted.withValues(alpha: 0.5)))),
+      ),
+    );
+  }
+
+  Widget _customChip(BuildContext context) {
+    final t = custom;
+    final on = t != null && selected != null && selected!.isAtSameMomentAs(t);
+    return Semantics(
+      button: true,
+      selected: on,
+      label: t == null ? 'Atur jam ambil sendiri' : 'Ambil paling lambat ${formatTime(t)}, ketuk untuk mengubah',
+      child: _chipShell(
+        context,
+        on: on,
+        enabled: true,
+        border: t == null ? AppColors.primary : AppColors.border,
+        onTap: onCustom,
+        child: t == null
+            ? Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(LucideIcons.pencil, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text('Atur jam', style: AppTypography.text(14, weight: 700, color: AppColors.primary)),
+              ])
+            : Text(formatTime(t), style: AppTypography.text(16, weight: 700, color: on ? AppColors.background : AppColors.ink)),
       ),
     );
   }

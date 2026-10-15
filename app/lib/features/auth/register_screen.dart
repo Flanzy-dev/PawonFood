@@ -25,8 +25,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _name = TextEditingController();
   final _contact = TextEditingController();
   final _password = TextEditingController();
-  var _receiver = true;
-  var _provider = true;
   var _submitted = false;
 
   @override
@@ -40,17 +38,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? get _nameError => _submitted ? Validators.name(_name.text) : null;
   String? get _contactError => _submitted ? Validators.emailOrPhone(_contact.text) : null;
   String? get _passwordError => _submitted ? Validators.password(_password.text) : null;
-  String? get _roleError => _submitted && !_receiver && !_provider ? 'Pilih minimal satu peran' : null;
-
-  bool get _hasErrors => _nameError != null || _contactError != null || _passwordError != null || _roleError != null;
+  bool get _hasErrors => _nameError != null || _contactError != null || _passwordError != null;
 
   void _submit() {
     setState(() => _submitted = true);
     if (_hasErrors) return;
+    // One account both takes and shares food, so there is no role to pick.
     ref.read(sessionProvider.notifier).register(
           name: _name.text,
           emailOrPhone: _contact.text,
-          roles: {if (_receiver) UserRole.receiver, if (_provider) UserRole.provider},
+          roles: {UserRole.receiver, UserRole.provider},
         );
   }
 
@@ -102,23 +99,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _submit(),
             ),
-            const SizedBox(height: 20),
-            Text('Saya mau', style: AppTypography.display(17, weight: 700)),
-            const SizedBox(height: 4),
-            AppCheckbox(value: _receiver, label: 'Mengambil makanan (Penerima)', textSize: 15, onChanged: (v) => setState(() => _receiver = v)),
-            AppCheckbox(value: _provider, label: 'Membagikan makanan (Penyedia)', textSize: 15, onChanged: (v) => setState(() => _provider = v)),
-            if (_roleError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Semantics(
-                  liveRegion: true,
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.triangleAlert, size: 16, color: AppColors.error)),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(_roleError!, style: AppTypography.text(13, weight: 600, height: 18, color: AppColors.error))),
-                  ]),
-                ),
-              ),
             const SizedBox(height: 24),
             AppButton(label: 'Buat akun', onPressed: blocked ? null : _submit),
             const SizedBox(height: 8),

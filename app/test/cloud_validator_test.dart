@@ -58,6 +58,22 @@ void main() {
       expect(future.verdict, AiVerdict.pendingReview, reason: 'never auto-approve a category the app cannot fill in');
     });
 
+    test('health_signals become suggested tags; a server without the field suggests none', () {
+      expect(parseCloudValidation(answer()).suggestedHealthTags, isEmpty);
+      final r = parseCloudValidation(answer({'health_signals': ['sayur_buah', 'protein', 'direbus_kukus', 'whatever']}));
+      expect(r.suggestedHealthTags, {HealthTag.sayurBuah, HealthTag.protein, HealthTag.tidakDigoreng});
+    });
+
+    test('"tidak digoreng" needs boiled or steamed and nothing fried; low sugar is never guessed', () {
+      expect(parseCloudValidation(answer({'health_signals': ['direbus_kukus', 'digoreng']})).suggestedHealthTags, isEmpty);
+      expect(parseCloudValidation(answer({'health_signals': ['rendah_gula']})).suggestedHealthTags, isEmpty);
+    });
+
+    test('malformed health_signals are an error', () {
+      expect(() => parseCloudValidation(answer({'health_signals': 'protein'})), throwsFormatException);
+      expect(() => parseCloudValidation(answer({'health_signals': [1]})), throwsFormatException);
+    });
+
     test('malformed or contradictory answers are errors, never approvals', () {
       final bad = <Object?>[
         null,
@@ -119,7 +135,8 @@ void main() {
     test('server errors, timeouts and bad bodies all throw ValidationUnavailable', () async {
       expect(await failureOf(validator((_) async => http.Response('{"error":{"code":"model_timeout"}}', 504)).validate('p.jpg')), ValidationFailure.timeout);
       expect(await failureOf(validator((_) async => http.Response('{}', 502)).validate('p.jpg')), ValidationFailure.badResponse);
-      expect(await failureOf(validator((_) async => http.Response('{}', 500)).validate('p.jpg')), ValidationFailure.network);
+      expect(await failureOf(validator((_) async => http.Response('{}', 500)).validate('p.jpg')), ValidationFailure.serverError);
+      expect(await failureOf(validator((_) async => http.Response('{}', 401)).validate('p.jpg')), ValidationFailure.serverError);
       expect(await failureOf(validator((_) async => http.Response('{}', 429)).validate('p.jpg')), ValidationFailure.rateLimited);
       expect(await failureOf(validator((_) async => http.Response('{}', 422)).validate('p.jpg')), ValidationFailure.uploadRejected);
       expect(await failureOf(validator((_) async => http.Response('<html>proxy</html>', 200)).validate('p.jpg')), ValidationFailure.badResponse);

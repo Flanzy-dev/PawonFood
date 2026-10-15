@@ -36,6 +36,7 @@ export const observation = (overrides = {}) => ({
   visible_signs: [],
   image_quality: 'good',
   warnings: [],
+  health_signals: [],
   ...overrides,
 });
 

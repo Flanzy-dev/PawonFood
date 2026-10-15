@@ -7,6 +7,7 @@ import 'package:pawonfood/core/services/food_label.dart';
 import 'package:pawonfood/core/theme/app_theme.dart';
 import 'package:pawonfood/core/widgets/food_card.dart';
 import 'package:pawonfood/core/widgets/form_controls.dart';
+import 'package:pawonfood/core/widgets/layout_widgets.dart';
 import 'package:pawonfood/core/widgets/pills.dart';
 import 'package:pawonfood/core/widgets/reward_card.dart';
 import 'package:pawonfood/features/auth/register_screen.dart';
@@ -96,6 +97,39 @@ group('FoodLabelBadge', () {
       expect(r[0].width, closeTo(r[0].height, 0.1));
       expect(r[1].top, r[0].top);
       expect(r[2].top, greaterThan(r[0].bottom));
+    });
+  });
+
+  group('SearchField', () {
+    testWidgets('shows ✕ only while there is text; ✕ clears it and reports the empty query', (tester) async {
+      String? last;
+      await tester.pumpWidget(host(SearchField(hint: 'Cari lauk, nasi, roti...', onChanged: (v) => last = v)));
+      expect(find.byTooltip('Hapus pencarian'), findsNothing);
+      await tester.enterText(find.byType(TextField), 'lodeh');
+      await tester.pump();
+      expect(last, 'lodeh');
+      expect(find.byTooltip('Hapus pencarian'), findsOneWidget);
+      await tester.tap(find.byTooltip('Hapus pencarian'));
+      await tester.pump();
+      expect(last, '');
+      expect(find.text('lodeh'), findsNothing);
+      expect(find.byTooltip('Hapus pencarian'), findsNothing);
+    });
+
+    testWidgets('Beranda: a search without results has no "Hapus filter" button; ✕ brings the feed back', (tester) async {
+      usePhoneScreen(tester);
+      await signIn(tester);
+      await tester.tap(find.byType(TextField).first); // opens the search page
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'zzz');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(find.text('Tidak ada hasil untuk "zzz"'), findsOneWidget);
+      expect(find.text('Hapus filter'), findsNothing);
+      await tester.tap(find.byTooltip('Hapus pencarian'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tidak ada hasil untuk "zzz"'), findsNothing);
+      expect(find.text('Pilihan untukmu di sekitar'), findsOneWidget);
     });
   });
 

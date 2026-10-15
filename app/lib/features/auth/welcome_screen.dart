@@ -154,14 +154,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   children: [
                     Align(alignment: Alignment.center, child: PageDots(count: _heroSlides.length, index: _index, label: 'Gambar ${_index + 1} dari ${_heroSlides.length}')),
                     const SizedBox(height: 10),
-                    const FadeSlideIn(delay: Duration(milliseconds: 200), child: Wordmark(width: 190)),
+                    // No entrance of their own: the sheet already rises with them, a second fade read as the screen
+                    // opening twice.
+                    const Wordmark(width: 190),
                     const SizedBox(height: 17),
-                    FadeSlideIn(delay: const Duration(milliseconds: 260), child: Text('Masak kebanyakan? Bagikan, jangan buang.', style: AppTypography.display(30, height: 36))),
+                    Text('Masak kebanyakan? Bagikan, jangan buang.', style: AppTypography.display(30, height: 36)),
                     const SizedBox(height: 12),
-                    FadeSlideIn(
-                      delay: const Duration(milliseconds: 320),
-                      child: Text('Penyelamatan makanan dari dapur ke komunitas.', style: AppTypography.text(15, weight: 500, color: AppColors.inkMuted)),
-                    ),
+                    Text('Penyelamatan makanan dari dapur ke komunitas.', style: AppTypography.text(15, weight: 500, color: AppColors.inkMuted)),
                     const SizedBox(height: 28),
                     AppButton(label: 'Daftar', onPressed: () => context.push('/register')),
                     const SizedBox(height: 12),

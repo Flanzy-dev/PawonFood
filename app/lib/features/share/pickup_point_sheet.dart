@@ -11,25 +11,26 @@ import '../../core/widgets/option_row.dart';
 
 /// C15b / C15b2 "Ubah titik ambil": pick a point on the map (starting from GPS) or one of the saved points. Applies to
 /// this listing only. [current] is the listing's point; a point picked on the map shows first with "Dari peta".
-/// Returns the chosen point, or null when dismissed.
-Future<PickupPoint?> showPickupPointSheet(BuildContext context, {required PickupPoint current}) => showAppSheet<PickupPoint>(
+/// Returns the chosen point, or null when dismissed. B8 reuses it for the delivery address ([title] "Ubah alamat antar").
+Future<PickupPoint?> showPickupPointSheet(BuildContext context, {required PickupPoint current, String title = 'Ubah titik ambil'}) => showAppSheet<PickupPoint>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
-      builder: (_) => _PickupPointSheet(current: current),
+      builder: (_) => _PickupPointSheet(current: current, title: title),
     );
 
 class _PickupPointSheet extends ConsumerWidget {
-  const _PickupPointSheet({required this.current});
+  const _PickupPointSheet({required this.current, required this.title});
 
   final PickupPoint current;
+  final String title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final saved = ref.watch(pickupPointsProvider);
     final options = [if (current.fromMap) current, ...saved];
     return SheetBody(
-      title: 'Ubah titik ambil',
+      title: title,
       scroll: true,
       children: [
         OptionRow(

@@ -34,5 +34,16 @@
       {"from": "p_dina", "type": "offer", "amount": 3000, "text": "Tawaran Rp3.000 · 1 porsi", "minutesAgo": 6},
       {"from": "p_dina", "type": "text", "text": "Kak, boleh Rp3.000? Aku ambil habis kuliah.", "minutesAgo": 6}
     ]
+  },
+  {
+    "id": "c5", "listingId": "l_own", "receiverId": "p_dito", "providerId": "me", "unread": 1,
+    "offer": {"amount": 5000, "status": "accepted", "portions": 1, "delivery": {"address": "Kos Mawar, Pogung Kidul", "lat": -7.765, "lng": 110.3748}},
+    "pickup": {"status": "reserved", "payMethod": "cash"},
+    "messages": [
+      {"from": "p_dito", "type": "text", "text": "Saya minta diantar ke Kos Mawar, Pogung Kidul ya.", "minutesAgo": 20},
+      {"from": "system", "type": "system", "text": "Ambil Rp5.000 disetujui.", "minutesAgo": 20},
+      {"from": "me", "type": "text", "text": "Siap, saya antar sebelum {pickupBy} ya.", "minutesAgo": 18},
+      {"from": "system", "type": "system", "text": "Dito memilih bayar tunai di tempat.", "minutesAgo": 17}
+    ]
   }
 ]

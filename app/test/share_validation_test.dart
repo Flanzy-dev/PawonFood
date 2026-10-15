@@ -204,5 +204,47 @@ void main() {
       expect(listing.categoryCorrected, isTrue);
       expect(listing.aiStatus, AiStatus.approved);
     });
+
+    testWidgets('the AI pre-selects the health tags; the provider can change them and they are published', (tester) async {
+      const result = ValidationResult(
+        verdict: AiVerdict.approved,
+        category: FoodCategory.makananMatang,
+        suggestedName: 'Sayur lodeh',
+        suggestedHealthTags: {HealthTag.sayurBuah, HealthTag.tidakDigoreng},
+      );
+      final c = await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: result));
+      expect(find.text('Pilihan sehat'), findsOneWidget);
+      expect(find.text('Ditandai otomatis oleh AI. Ubah kalau kurang tepat.'), findsOneWidget);
+      expect(find.text('Ide resep'), findsNothing, reason: 'recipes are for fresh ingredients only');
+      await tester.tap(find.text('Protein')); // add one the AI did not see
+      await tester.tap(find.text('Tidak digoreng')); // remove one
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bagikan sekarang'));
+      await tester.pumpAndSettle();
+      expect(c.read(listingsProvider).first.healthTags, {HealthTag.sayurBuah, HealthTag.protein});
+    });
+
+    testWidgets('fresh ingredients show recipe ideas from the name; the chosen recipe is published', (tester) async {
+      const result = ValidationResult(verdict: AiVerdict.approved, category: FoodCategory.bahanMentah, suggestedName: 'Wortel dan kol', suggestedHealthTags: {HealthTag.sayurBuah});
+      final c = await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: result));
+      expect(find.text('Ide resep'), findsOneWidget);
+      expect(find.text('Minta ide dari AI'), findsNothing, reason: 'no cloud server configured');
+      await tester.scrollUntilVisible(find.text('Tumis Kol Wortel'), 100, scrollable: find.byType(Scrollable).first);
+      expect(find.text('Sup Wortel Kol'), findsOneWidget);
+      await tester.tap(find.text('Tumis Kol Wortel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bagikan sekarang'));
+      await tester.pumpAndSettle();
+      final listing = c.read(listingsProvider).first;
+      expect(listing.category, FoodCategory.bahanMentah);
+      expect(listing.recipe?.id, 'r_tumis_kol_wortel');
+    });
+
+    testWidgets('a name without a known ingredient shows that no recipe matches', (tester) async {
+      const result = ValidationResult(verdict: AiVerdict.approved, category: FoodCategory.bahanMentah, suggestedName: 'Durian');
+      await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: result));
+      await tester.scrollUntilVisible(find.text('Belum ada resep yang cocok.'), 100, scrollable: find.byType(Scrollable).first);
+      expect(find.text('Belum ada resep yang cocok.'), findsOneWidget);
+    });
   });
 }

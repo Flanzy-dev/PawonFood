@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -92,6 +93,31 @@ void main() {
       expect(seen.url.path, '/routed-foot/route/v1/foot/110.3799,-7.7597;110.3809,-7.7576');
       expect(seen.url.queryParameters['steps'], 'true');
       expect(seen.headers['User-Agent'], startsWith('PawonFood'));
+      expect(r!.path.first, const LatLng(-7.7597, 110.3799), reason: 'the line starts on the real position, not the snapped road point');
+      expect(r.path.last, const LatLng(-7.7576, 110.3809), reason: 'and ends on the pickup point');
+    });
+
+    test('withEnds joins the line to the real start and destination, and the steps move with it', () {
+      const from = LatLng(-7.7600, 110.3796), to = LatLng(-7.7576, 110.3809); // ~33 m and ~26 m off the snapped ends
+      const d = Distance();
+      final head = d(from, route.path.first), tail = d(route.path.last, to);
+      expect(head, greaterThan(20));
+      expect(tail, greaterThan(20));
+
+      final r = withEnds(route, from, to);
+      expect(r.path.first, from);
+      expect(r.path.last, to);
+      expect(r.path.length, route.path.length + 2);
+      expect(r.meters, closeTo(route.meters + head + tail, 0.01));
+      expect(r.fromStreets, isTrue);
+      expect(r.steps.length, route.steps.length);
+      expect(r.steps.first.startsAt, 0);
+      expect(r.steps[1].startsAt, closeTo(route.steps[1].startsAt + head, 0.01));
+      expect(r.steps.last.startsAt, closeTo(pathLength(r.path), 0.01));
+      for (var i = 1; i < r.steps.length; i++) {
+        expect(r.steps[i].startsAt, greaterThanOrEqualTo(r.steps[i - 1].startsAt - 1), reason: 'steps still follow the path');
+      }
+      expect(withEnds(route, route.path.first, route.path.last), same(route), reason: 'nothing to join when the ends already match');
     });
 
     test('any failure gives no route, never a made-up one', () async {
@@ -177,6 +203,15 @@ void main() {
       await tester.pump(const Duration(seconds: 13));
       await tester.pumpAndSettle();
       expect(find.text('Kamu sudah sampai'), findsWidgets);
+    });
+
+    testWidgets('the destination pin\'s tip sits on its point (the marker\'s bottom edge)', (tester) async {
+      await openRoute(tester);
+      final pin = find.byWidgetPredicate((w) => w is SvgPicture && w.semanticsLabel == 'Titik ambil');
+      expect(pin, findsOneWidget);
+      final marker = find.ancestor(of: pin, matching: find.byWidgetPredicate((w) => w is Column && w.mainAxisAlignment == MainAxisAlignment.end));
+      expect(marker, findsOneWidget);
+      expect(tester.getRect(pin).bottom, closeTo(tester.getRect(marker).bottom, 0.5));
     });
 
     testWidgets('long-pressing "Mulai jalan" runs the demo walk even with GPS', (tester) async {

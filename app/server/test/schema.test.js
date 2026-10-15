@@ -61,3 +61,12 @@ test('malformed answers are errors, never defaults', () => {
   for (const text of bad) assert.throws(() => parseModelOutput(text), ModelResponseError, text);
   assert.throws(() => parseModelOutput(null), ModelResponseError);
 });
+
+test('health_signals: allow-listed and deduplicated, missing means none, never for non-food', () => {
+  assert.deepEqual(parse(observation({ health_signals: [' Protein ', 'protein', 'digoreng', 'superfood', 'rendah_gula'] })).health_signals, ['protein', 'digoreng']);
+  const { health_signals: _, ...old } = observation();
+  assert.deepEqual(parse(old).health_signals, [], 'answers from before the field still parse');
+  assert.deepEqual(parse(observation({ is_food: false, category: 'bukan_makanan', health_signals: ['sayur_buah'] })).health_signals, []);
+  assert.throws(() => parse(observation({ health_signals: 'protein' })), ModelResponseError);
+  assert.throws(() => parse(observation({ health_signals: [1] })), ModelResponseError);
+});

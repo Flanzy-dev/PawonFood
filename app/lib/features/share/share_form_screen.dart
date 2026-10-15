@@ -9,20 +9,26 @@ import '../../core/data/listings_repository.dart';
 import '../../core/data/providers.dart';
 import '../../core/data/pickup_points_repository.dart';
 import '../../core/models/enums.dart';
+import '../../core/models/recipe.dart';
 import '../../core/motion/entrance.dart';
 import '../../core/motion/motion.dart';
 import '../../core/services/food_validator.dart';
 import '../../core/services/formatters.dart';
 import '../../core/services/pickup_times.dart';
+import '../../core/services/recipe_ideas.dart';
+import '../../core/services/recipe_matcher.dart';
+import '../../core/services/validators.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_chip.dart';
 import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/form_controls.dart';
 import '../../core/widgets/info_box.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/option_row.dart';
+import '../../core/widgets/pickup_time_sheet.dart';
 import '../../core/widgets/pills.dart';
 import 'pickup_point_sheet.dart';
 import 'share_state.dart';
@@ -43,8 +49,17 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   var _portions = 2;
   var _free = false;
   var _negotiable = true;
+
+  /// "Cara serah terima": "Ambil di tempat" (on by default), and "Bisa diantar (< 1 km)" with the fee the provider picks.
+  /// Delivery is off by default, so pickup alone keeps the 3 taps. At least one must stay on.
+  var _pickup = true;
+  var _delivery = false;
+  var _deliveryFee = 2000;
   late final List<DateTime> _times;
   DateTime? _pickupBy;
+
+  /// The deadline picked with "Atur jam" (shown on the fourth chip).
+  DateTime? _customPickup;
   late PickupPoint _point = ref.read(pickupPointsProvider.notifier).primary;
   DateTime? _bestBefore;
   String? _nameError;
@@ -53,12 +68,21 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   String? _formError;
   var _published = false;
 
+  /// "Pilihan sehat": pre-selected from what the AI saw, then confirmed by the provider.
+  late final Set<HealthTag> _healthTags;
+
+  /// "Ide resep" (fresh ingredients only): the attached recipe, and ideas asked from the AI.
+  Recipe? _recipe;
+  var _aiRecipes = <Recipe>[];
+  var _askingAi = false;
+
   @override
   void initState() {
     super.initState();
     final capture = ref.read(shareCaptureProvider);
     _name = TextEditingController(text: capture?.result.suggestedName ?? '');
     _category = capture?.result.category;
+    _healthTags = {...?capture?.result.suggestedHealthTags};
     _times = suggestPickupTimes(ref.read(clockProvider)());
     _pickupBy = _times[1];
   }
@@ -68,6 +92,17 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
     _name.dispose();
     _price.dispose();
     super.dispose();
+  }
+
+  /// "Atur jam": a time picker for the latest pickup time (30 minutes to 6 hours from now).
+  Future<void> _pickCustomTime() async {
+    final t = await showPickupTimeSheet(context, now: ref.read(clockProvider)(), initial: _customPickup ?? _pickupBy);
+    if (t != null && mounted) {
+      setState(() {
+        _customPickup = t;
+        _pickupBy = t;
+      });
+    }
   }
 
   void _publish() {
@@ -86,6 +121,12 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
       _formError = null;
     });
     if (_nameError != null || _priceError != null || _categoryError != null) return;
+    // A deadline picked with "Atur jam" must stay inside the allowed window (the quick chips always do).
+    final deadlineError = _customPickup != null && _pickupBy == _customPickup ? Validators.pickupWindow(_customPickup!, ref.read(clockProvider)()) : null;
+    if (deadlineError != null) {
+      setState(() => _formError = deadlineError);
+      return;
+    }
     final result = ref.read(listingsProvider.notifier).publish(
           PublishDraft(
             name: _name.text,
@@ -98,6 +139,10 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
             pickupPoint: _point.fromMap ? '${_point.name}, ${_point.address}' : _point.name,
             pickupPosition: _point.position,
             bestBefore: _category == FoodCategory.sealedFood ? _bestBefore : null,
+            healthTags: _healthTags,
+            recipe: _category == FoodCategory.bahanMentah ? _recipe : null,
+            deliveryFee: _delivery ? _deliveryFee : null,
+            allowsPickup: _pickup,
             photoPath: capture.photoPath,
             aiConfidence: capture.result.confidence,
             aiStatus: capture.result.verdict == AiVerdict.approved ? AiStatus.approved : AiStatus.pendingReview,
@@ -110,6 +155,30 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
     _published = true;
     context.pushReplacement('/share/done/${result.listing!.id}');
   }
+
+  /// "Minta ide dari AI": asks the server for recipe ideas for the typed ingredients; the local list stays on failure.
+  Future<void> _askAi() async {
+    final ideas = ref.read(recipeIdeasProvider);
+    final text = _name.text.trim();
+    if (ideas == null || _askingAi) return;
+    if (text.length < 2) {
+      setState(() => _nameError = 'Isi nama bahan dulu');
+      return;
+    }
+    setState(() => _askingAi = true);
+    try {
+      final found = await ideas.suggest(text);
+      if (!mounted) return;
+      setState(() => _aiRecipes = found);
+      if (found.isEmpty) _snack('AI belum punya ide untuk bahan ini.');
+    } on RecipeIdeasUnavailable {
+      if (mounted) _snack('Ide resep dari AI belum bisa dimuat.');
+    } finally {
+      if (mounted) setState(() => _askingAi = false);
+    }
+  }
+
+  void _snack(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _changePoint() async {
     final picked = await showPickupPointSheet(context, current: _point);
@@ -171,6 +240,50 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
           );
         },
       ),
+    );
+  }
+
+  /// "Ide resep": recipes that use the typed ingredients; the provider can attach one for the receiver.
+  Widget _recipeSection() {
+    final library = ref.watch(recipesProvider);
+    final local = suggestRecipes(_name.text, library);
+    final options = [
+      for (final m in local) (m.recipe, 'cocok: ${m.matched.join(', ')}'),
+      for (final r in _aiRecipes) (r, 'Ide AI'),
+    ];
+    // An attached recipe stays listed even after the name changed and it no longer matches.
+    if (_recipe != null && options.every((o) => o.$1.id != _recipe!.id)) options.insert(0, (_recipe!, 'dipilih'));
+    final canAskAi = ref.watch(recipeIdeasProvider) != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text('Ide resep', style: AppTypography.display(17, weight: 700)),
+        const SizedBox(height: 4),
+        Text('Resep yang kamu pilih ditandai Diverifikasi pemberi. Tanpa pilihan, penerima tetap melihat saran otomatis yang belum diverifikasi.', style: AppTypography.text(13, color: AppColors.inkMuted)),
+        const SizedBox(height: 10),
+        if (options.isEmpty)
+          Text('Belum ada resep yang cocok.', style: AppTypography.text(14, color: AppColors.inkMuted))
+        else
+          for (final (r, why) in options)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: OptionRow(
+                title: r.title,
+                subtitle: '${r.minutes} mnt · $why',
+                lead: OptionLead.icon,
+                icon: LucideIcons.chefHat,
+                showCheck: true,
+                selected: _recipe?.id == r.id,
+                onTap: () => setState(() => _recipe = _recipe?.id == r.id ? null : r),
+              ),
+            ),
+        if (canAskAi)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppButton(label: _askingAi ? 'Mencari ide...' : 'Minta ide dari AI', variant: AppButtonVariant.outline, expand: false, onPressed: _askingAi ? null : _askAi),
+          ),
+      ],
     );
   }
 
@@ -268,6 +381,16 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                     QtyStepper(value: _portions, max: 50, onChanged: (v) => setState(() => _portions = v)),
                   ]),
                   const SizedBox(height: 16),
+                  Text('Pilihan sehat', style: AppTypography.display(17, weight: 700)),
+                  const SizedBox(height: 4),
+                  Text('Ditandai otomatis oleh AI. Ubah kalau kurang tepat.', style: AppTypography.text(13, color: AppColors.inkMuted)),
+                  const SizedBox(height: 10),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final t in HealthTag.values)
+                      AppChip(label: t.label, selected: _healthTags.contains(t), onTap: () => setState(() => _healthTags.contains(t) ? _healthTags.remove(t) : _healthTags.add(t))),
+                  ]),
+                  if (_category == FoodCategory.bahanMentah) _recipeSection(),
+                  const SizedBox(height: 16),
                   Text('Mau dibagikan bagaimana?', style: AppTypography.display(17, weight: 700)),
                   const SizedBox(height: 8),
                   SegmentedControl(options: const ['Gratis', 'Jual murah'], selected: _free ? 0 : 1, onChanged: (i) => setState(() => _free = i == 0)),
@@ -304,16 +427,50 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                     ),
                   // The checkbox row carries its own 10 px of padding, so the gap is shorter after it.
                   SizedBox(height: _free ? 16 : 5),
-                  Text('Ambil paling lambat jam', style: AppTypography.display(17, weight: 700)),
+                  Text('Cara serah terima', style: AppTypography.display(17, weight: 700)),
+                  AppCheckbox(
+                    value: _pickup,
+                    label: 'Ambil di tempat',
+                    textSize: 15,
+                    helper: 'Penerima datang ke titik ambil',
+                    onChanged: (v) => setState(() => _pickup = v),
+                  ),
+                  AppCheckbox(
+                    value: _delivery,
+                    label: 'Bisa diantar (< 1 km)',
+                    textSize: 15,
+                    helper: 'Kamu antar sendiri ke penerima',
+                    onChanged: (v) => setState(() => _delivery = v),
+                  ),
+                  // Shown as soon as both are off; "Bagikan sekarang" refuses it too.
+                  if (Validators.handover(_pickup, _delivery ? _deliveryFee : null) case final error?) ...[
+                    const SizedBox(height: 4),
+                    Text(error, style: AppTypography.text(13, weight: 600, color: AppColors.error)),
+                    const SizedBox(height: 12),
+                  ],
+                  if (_delivery) ...[
+                    const SizedBox(height: 4),
+                    Text('Ongkir', style: AppTypography.text(14, weight: 600)),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final fee in deliveryFeeOptions)
+                        AppChip(label: formatRupiah(fee), selected: _deliveryFee == fee, onTap: () => setState(() => _deliveryFee = fee)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Text('Ongkir seluruhnya untukmu.', style: AppTypography.text(13, color: AppColors.inkMuted)),
+                    const SizedBox(height: 16),
+                  ] else
+                    const SizedBox(height: 5),
+                  Text(_pickup ? 'Ambil paling lambat jam' : 'Antar paling lambat jam', style: AppTypography.display(17, weight: 700)),
                   const SizedBox(height: 8),
-                  TimeChips(times: _times, selected: _pickupBy, now: now, onSelected: (t) => setState(() => _pickupBy = t)),
+                  TimeChips(times: _times, selected: _pickupBy, now: now, custom: _customPickup, onSelected: (t) => setState(() => _pickupBy = t), onCustom: _pickCustomTime),
                   const SizedBox(height: 14),
                   Row(children: [
                     const Icon(LucideIcons.mapPin, size: 18, color: AppColors.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: FadeSwitch(
-                        child: Text('Titik ambil: ${_point.name}', key: ValueKey(_point.id), style: AppTypography.text(13, weight: 500, color: AppColors.inkMuted)),
+                        child: Text('${_pickup ? 'Titik ambil' : 'Antar dari'}: ${_point.name}', key: ValueKey(_point.id), style: AppTypography.text(13, weight: 500, color: AppColors.inkMuted)),
                       ),
                     ),
                     Semantics(

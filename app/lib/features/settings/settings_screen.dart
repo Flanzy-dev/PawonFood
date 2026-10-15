@@ -6,7 +6,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/data/session_repository.dart';
 import '../../core/data/settings_repository.dart';
 import '../../core/motion/entrance.dart';
-import '../../core/services/formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
@@ -14,6 +13,7 @@ import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/form_controls.dart';
 import '../../core/widgets/logout_confirm.dart';
 import '../../core/widgets/option_row.dart';
+import '../../core/widgets/radius_sheet.dart';
 import '../../core/widgets/settings_list.dart';
 import '../../core/widgets/top_bar.dart';
 
@@ -63,35 +63,12 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _radiusSheet(BuildContext context, WidgetRef ref) => showAppSheet<void>(
-        context: context,
-        builder: (ctx) => Consumer(
-          builder: (ctx, ref, _) {
-            final current = ref.watch(settingsProvider).radiusMeters;
-            return SheetBody(
-              title: 'Radius default',
-              subtitle: 'Dipakai di Beranda dan Peta',
-              children: [
-                for (final m in const [500.0, 1000.0, 2000.0])
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: OptionRow(
-                      title: formatRadius(m),
-                      subtitle: 'Jalan kaki ± ${walkMinutes(m)} mnt',
-                      tag: m == 1000 ? 'Disarankan' : null,
-                      selected: m == current,
-                      onTap: () {
-                        ref.read(settingsProvider.notifier).setRadius(m);
-                        Future<void>.delayed(const Duration(milliseconds: 180), () {
-                          if (ctx.mounted) Navigator.of(ctx).pop();
-                        });
-                      },
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
+  void _radiusSheet(BuildContext context, WidgetRef ref) => showRadiusSheet(
+        context,
+        title: 'Radius default',
+        subtitle: 'Dipakai di Beranda dan Peta',
+        current: (ref) => ref.watch(settingsProvider).radiusMeters,
+        onPick: (ref, m) => ref.read(settingsProvider.notifier).setRadius(m),
       );
 
   void _languageSheet(BuildContext context) => showAppSheet<void>(
