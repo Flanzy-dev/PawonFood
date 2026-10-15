@@ -178,8 +178,10 @@ final feedProvider = Provider<List<FeedItem>>((ref) {
     items.add(FeedItem(l, d));
   }
   items.sort((a, b) {
-    final byPortions = a.listing.portionsLeft.compareTo(b.listing.portionsLeft);
-    return byPortions != 0 ? byPortions : a.distance.compareTo(b.distance);
+    final aHealthy = a.listing.category == FoodCategory.bahanMentah;
+    final bHealthy = b.listing.category == FoodCategory.bahanMentah;
+    if (aHealthy != bHealthy) return aHealthy ? -1 : 1;
+    return a.distance.compareTo(b.distance);
   });
   return items;
 });
