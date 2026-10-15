@@ -278,7 +278,7 @@ export default {
             ctx,
             struck(t, TO_CHAT, springs.ui),
             sw,
-            () => mapScreen(ctx, MAP_END + t, img, sx, sy, sw, sh, { card: false }),
+            () => mapScreen(ctx, MAP_END + t, img, sx, sy, sw, sh, { card: false, pins: 'photo' }),
             () => chatScreen(ctx, t - TO_CHAT, img, sx, sy, sw, sh),
           ),
         );

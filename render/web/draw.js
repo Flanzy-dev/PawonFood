@@ -190,6 +190,37 @@ export function pricePin(ctx, label, x, y, { fill, ink, stroke, scale = 1, opaci
   ctx.restore();
 }
 
+/**
+ * The app's map pin: a food photo in a circle `size` wide, with a white rim and a coloured `ring` (green free, terracotta
+ * paid), centred on (x, y). No price: the card shows it.
+ */
+export function photoPin(ctx, image, x, y, { size = 44, ring = color.primary, scale = 1, opacity = 1 }) {
+  if (opacity <= 0) return;
+  const r = size / 2;
+  ctx.save();
+  ctx.globalAlpha *= opacity;
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.save();
+  ctx.shadowColor = alpha(color.ink, 0.18);
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = ring;
+  ctx.fill();
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 2, 0, Math.PI * 2);
+  ctx.fillStyle = color.surface;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 5, 0, Math.PI * 2);
+  ctx.clip();
+  cover(ctx, image, -(r - 5), -(r - 5), 2 * (r - 5), 2 * (r - 5));
+  ctx.restore();
+}
+
 /** The receiver's own location: a green dot with a white ring. */
 export function userPin(ctx, x, y, r = 12) {
   ctx.save();

@@ -1,5 +1,5 @@
-// Ad scene 2 (4–7 s): match cut from the kitchen to a split frame. The surplus meal sits in the top panel, a student in a
-// nearby kos room in the bottom one, and a walking route draws itself from the food to the student.
+// Ad scene 2 (4–7 s): match cut from the kitchen to a split frame. The surplus meal sits in the top panel, the student in
+// the same kitchen in the bottom one, and a walking route draws itself from the food to the student.
 
 import { color, alpha, display, springs } from '../tokens.js';
 import { enter, fade, lerp, pop } from '../ease.js';
@@ -17,9 +17,9 @@ const ARRIVE = CUES.arrive - SCENES.opportunity;
 const TOP = { x: 60, y: 110, w: 960, h: 660, r: 44 };
 const BOTTOM = { x: 60, y: 1140, w: 960, h: 700, r: 44 };
 // The student's phone in room.png, normalised: where the route ends.
-const STUDENT_PHONE = { x: 0.38, y: 0.61 };
-// What the room panel frames on: between her face and her phone, so her head keeps some room above it.
-const STUDENT_FRAME = { x: 0.5, y: 0.56 };
+const STUDENT_PHONE = { x: 0.45, y: 0.625 };
+// What the student panel frames on: between her face and her phone, so her head keeps some room above it.
+const STUDENT_FRAME = { x: 0.55, y: 0.57 };
 
 function panelShadow(ctx, { x, y, w, h, r }) {
   ctx.save();
@@ -118,7 +118,7 @@ export default {
     // Scene 1's cream wash over the top of the frame dissolves instead of vanishing on the cut.
     creamWash(ctx, stage, 1 - fade(t, 0));
 
-    // The student's room rises in as the bottom panel and lands with a little give.
+    // The student, in the same kitchen, rises in as the bottom panel and lands with a little give.
     const up = springAt(t, ROOM, springs.land);
     let student = null;
     if (up > 0) {

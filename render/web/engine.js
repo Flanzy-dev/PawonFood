@@ -34,6 +34,10 @@ const STAGES = { landscape: { w: 1920, h: 1080, portrait: false }, portrait: { w
 const ASSETS = '/assets/';
 const IMAGES = {
   lodeh: `${ASSETS}images/food/lodeh.jpg`,
+  // The other photo pins on the ad's map.
+  ayam: `${ASSETS}images/food/ayam.jpg`,
+  sayur: `${ASSETS}images/food/sayur.jpg`,
+  roti: `${ASSETS}images/food/roti.jpg`,
   wordmark: `${ASSETS}images/brand/wordmark.png`,
   // Watercolour scenes for the ad, generated with Figma AI in the style of the onboarding art (see AD.md).
   kitchen: '/media/kitchen.png',

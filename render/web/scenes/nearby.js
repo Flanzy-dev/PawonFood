@@ -3,14 +3,15 @@
 import { color, alpha, display, ui, motion, springs } from '../tokens.js';
 import { enter, lerp, pop, rng } from '../ease.js';
 import { struck } from '../spring.js';
-import { caption, featureLayout, fillStage, listingCard, pricePin, risingPhone, rrect, text, userPin } from '../draw.js';
+import { caption, featureLayout, fillStage, listingCard, photoPin, pricePin, risingPhone, rrect, text, userPin } from '../draw.js';
 
-// Offsets from the user pin. The first one is the lodeh listing on the card.
+// Offsets from the user pin. The first one is the lodeh listing on the card. `label` is the promo's price pin, `photo`
+// the ad's photo pin (the app's current map).
 const PINS = [
-  { dx: -96, dy: -96, label: 'Gratis', free: true },
-  { dx: 112, dy: -58, label: 'Rp5.000', free: false },
-  { dx: -52, dy: 118, label: 'Gratis', free: true },
-  { dx: 126, dy: 96, label: 'Gratis', free: true },
+  { dx: -96, dy: -96, label: 'Gratis', photo: 'lodeh', free: true },
+  { dx: 112, dy: -58, label: 'Rp5.000', photo: 'ayam', free: false },
+  { dx: -52, dy: 118, label: 'Gratis', photo: 'sayur', free: true },
+  { dx: 126, dy: 96, label: 'Gratis', photo: 'roti', free: true },
 ];
 
 export default {
@@ -27,8 +28,11 @@ export default {
 /** Where the listing card sits on the map screen. The ad lifts the card out of the phone from exactly here. */
 export const mapCardRect = (sx, sy, sw, sh) => [sx + 14, sy + sh - 212, sw - 28, 190];
 
-/** The Peta screen at scene time `t`. `card: false` leaves the listing card out (the ad draws it floating instead). */
-export function mapScreen(ctx, t, img, sx, sy, sw, sh, { card = true } = {}) {
+/**
+ * The Peta screen at scene time `t`. `card: false` leaves the listing card out (the ad draws it floating instead).
+ * `pins: 'photo'` draws the app's photo pins in place of the price labels.
+ */
+export function mapScreen(ctx, t, img, sx, sy, sw, sh, { card = true, pins = 'price' } = {}) {
   ctx.fillStyle = color.background;
   ctx.fillRect(sx, sy, sw, sh);
   text(ctx, 'Peta', sx + 24, sy + 104, { font: display(30, 800), fill: color.ink, spacing: -0.9 });
@@ -72,6 +76,16 @@ export function mapScreen(ctx, t, img, sx, sy, sw, sh, { card = true } = {}) {
   PINS.forEach((p, i) => {
     const pp = pop(t, 0.26 + i * motion.stagger * 2);
     const selected = i === 0 ? enter(t, 0.66) : 0;
+    if (pins === 'photo') {
+      // The chosen pin grows from 44 to 52 px with a green ring, as in the app.
+      photoPin(ctx, img[p.photo], cx + p.dx, cy + p.dy, {
+        size: lerp(44, 52, selected),
+        ring: p.free ? color.primary : color.accent,
+        scale: pp.scale,
+        opacity: pp.alpha,
+      });
+      return;
+    }
     pricePin(ctx, p.label, cx + p.dx, cy + p.dy, {
       fill: p.free ? color.primary : color.surface,
       ink: p.free ? color.surface : color.ink,

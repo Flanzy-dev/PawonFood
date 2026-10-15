@@ -132,7 +132,7 @@ function screen(ctx, t, img, push, sx, sy, sw, sh) {
         ctx.fillRect(sx, sy, sw, sh);
       }
     },
-    () => mapScreen(ctx, t - TO_MAP, img, sx, sy, sw, sh, { card: t < LIFT }),
+    () => mapScreen(ctx, t - TO_MAP, img, sx, sy, sw, sh, { card: t < LIFT, pins: 'photo' }),
   );
 }
 
