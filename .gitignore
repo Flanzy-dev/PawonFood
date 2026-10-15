@@ -17,11 +17,9 @@ GoogleService-Info.plist
 stop-slop/
 skills-lock.json
 
-# Own repository (GitHub Flanzy-dev/PawonFood)
-app/
-
-# Backup of the old root history
+# Backups of the old root history and the old app repository (GitHub Flanzy-dev/PawonFood, archived)
 .git-old-backup/
+.git-app-backup/
 
 # Generated renders
 render/out/

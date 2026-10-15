@@ -1,0 +1,15 @@
+{
+  "name": "pawonfood-validation-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PawonFood food-photo validation endpoint: Qwen vision model behind a server-side rules layer.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/main.js",
+    "dev": "node --watch --env-file-if-exists=.env src/main.js",
+    "test": "node --test \"test/*.test.js\""
+  }
+}

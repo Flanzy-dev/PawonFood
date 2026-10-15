@@ -1,0 +1,10 @@
+[
+  {"id": "r_voucher", "title": "Voucher belanja minimarket", "subtitle": "200 poin", "tile": "Rp", "cost": 200, "tone": "sand", "category": "belanja"},
+  {"id": "r_ojek", "title": "Diskon layanan antar", "subtitle": "150 poin", "tile": "Ojek", "cost": 150, "tone": "tint", "category": "antar"},
+  {"id": "r_sertifikat", "title": "Sertifikat Resto Peduli Lingkungan", "shortTitle": "Sertifikat Peduli Lingkungan", "subtitle": "Bulanan · untuk warung dan resto", "tile": "Hijau", "cost": 0, "tone": "green", "category": "sertifikat"},
+  {"id": "r_pulsa", "title": "Voucher pulsa", "subtitle": "100 poin", "tile": "Rp", "cost": 100, "tone": "sand", "category": "belanja"},
+  {"id": "r_ongkir", "title": "Diskon ongkir", "subtitle": "75 poin", "tile": "Ojek", "cost": 75, "tone": "tint", "category": "antar"},
+  {"id": "r_sembako", "title": "Voucher sembako", "subtitle": "300 poin", "tile": "Rp", "cost": 300, "tone": "sand", "category": "belanja"},
+  { "id": "r_makan3", "title": "Potongan makanan Rp3.000", "shortTitle": "Potongan makanan Rp3.000", "subtitle": "120 poin", "tile": "Rp", "cost": 120, "tone": "green", "category": "makanan", "foodDiscount": 3000 },
+  { "id": "r_makan5", "title": "Potongan makanan Rp5.000", "shortTitle": "Potongan makanan Rp5.000", "subtitle": "200 poin", "tile": "Rp", "cost": 200, "tone": "green", "category": "makanan", "foodDiscount": 5000 }
+]

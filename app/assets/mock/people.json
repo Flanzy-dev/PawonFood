@@ -1,0 +1,12 @@
+[
+  {"id": "p_siti", "name": "Warteg Bu Siti", "tier": "pahlawanPangan", "rating": 4.8, "tone": "primary"},
+  {"id": "p_wulan", "name": "Bu Kos Wulan", "tier": "sobatPawon", "rating": 4.6, "tone": "olive"},
+  {"id": "p_barokah", "name": "Warmindo Barokah", "tier": "foodSavior", "rating": 4.4, "tone": "taupe"},
+  {"id": "p_dito", "name": "Dito, anak kos", "tier": "sobatPawon", "rating": 4.5, "tone": "olive"},
+  {"id": "p_ani", "name": "Katering Ibu Ani", "tier": "foodSavior", "rating": 4.7, "tone": "primary"},
+  {"id": "p_joko", "name": "Warung Pak Joko", "tier": "sobatPawon", "rating": 4.3, "tone": "taupe"},
+  {"id": "p_berkah", "name": "Katering Berkah", "tier": "pahlawanPangan", "rating": 4.9, "tone": "primary"},
+  {"id": "p_retno", "name": "Bu Retno", "tier": "sobatPawon", "rating": 4.6, "tone": "olive"},
+  {"id": "p_dina", "name": "Dina Ayu", "tier": "sobatPawon", "rating": 0, "tone": "olive"},
+  {"id": "me", "name": "Kos Melati", "tier": "sobatPawon", "rating": 4.7, "tone": "primary"}
+]
