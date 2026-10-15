@@ -1,0 +1,5 @@
+# What 3_api.py needs to serve recommendations. `implicit` (in requirements.txt) is only for training.
+fastapi>=0.110
+uvicorn>=0.29
+numpy>=1.24
+scipy>=1.10

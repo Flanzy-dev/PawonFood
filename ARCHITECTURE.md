@@ -77,6 +77,54 @@ the server.
 A failed or malformed check never approves a photo. The visual check does not certify food safety; the provider
 guarantee stays. Setup, deployment and limits are in `app/server/README.md`.
 
+### Feed ranking
+
+`feedProvider` ranks the Beranda feed ("Pilihan untukmu di sekitar") by `feedScore`
+(`app/lib/core/services/food_score.dart`), highest first, nearest first on a tie. As in the PRD:
+
+```text
+score = affinity × proximity × urgency
+```
+
+| Factor | Range | How it is computed |
+| --- | --- | --- |
+| Affinity | 0.2..1 | From the FYP recommender (below): 1 for the item it ranks first, down to 0.2 for the last; 0.6 for a listing it does not rank (published in the app). 1 for every listing when no recommender is configured |
+| Proximity | 0.2..1 | 1 at the user, 0.2 at the edge of the search radius |
+| Urgency | 0.2..1 | Half from stock (1 portion = 1, 8+ = 0), half from time left to `pickup_by` (≤ 30 min = 1, ≥ 6 h = 0), then floored at 0.2 |
+
+The floors keep any single factor from zeroing a listing out of the product.
+
+**FYP recommender** (`ml/fyp/`, see its README): a trained ALS model (500 users × 200 items) behind a small FastAPI
+server, received ready to use. The app reads `GET /recommend?user_id=u0&n=200` once (`fypRankingProvider`) with
+`--dart-define=PAWON_FYP_URL=...`. It reports actions with `POST /event`:
+
+- `view` when the food detail stays open 3 s;
+- `addtocart` on "Ambil" or a sent offer;
+- `transaction` on a successful QR scan.
+
+The server only appends these to `data/events.csv`; the order learns from them after the model is retrained. The model
+was trained on another dataset, so for the demo the demo account is model user `u0`, and each mock listing carries a
+model item id (`fypItem` in `listings.json`). A failed or missing server leaves the feed on proximity × urgency.
+
+Card labels are separate from the order: *Sehat* at a health score ≥ 0.5 (sum of the provider's tags: Sayur/buah 0.4,
+Protein 0.25, Tidak digoreng 0.2, Rendah gula 0.15), *Segar* for raw ingredients at freshness ≥ 0.75. Freshness:
+cooked food is 1 when just cooked and 0 after 6 h (0.5 if unknown), raw ingredients are 0.9, sealed food follows
+`best_before` (3+ days = 1, today = 0.2). The tags are set by the provider; the cloud validator only pre-selects them
+from `health_signals` (what is visibly in the photo, never a health rating, never low sugar). Nothing here certifies food
+safety.
+
+### Recipe ideas
+
+Fresh ingredients ("Bahan mentah") can carry a recipe. The local library is `assets/mock/recipes.json`, matched to the
+listing's name and description by ingredient keywords (`recipe_matcher.dart`). With `PAWON_VALIDATOR_URL` set, the
+share form can also ask `POST /v1/recipe-ideas` on `app/server`: text only, the same token and rate limit, and a
+strict schema that drops recipes with safety or health claims. Details in `app/server/README.md`.
+
+Who sees what: the recipe is for buyers only (not on the seller's own listing). A recipe the seller attached
+(`listing.recipe`) is shown as verified by the seller; without one, the detail screen shows the best library match with
+a "Belum diverifikasi pemberi" label. AI-written recipes only exist in the share form, so one reaches a buyer only when
+the seller picked it.
+
 ## Project structure
 
 ```text
@@ -109,8 +157,8 @@ guarantee stays. Setup, deployment and limits are in `app/server/README.md`.
 | Entity                 | Key fields                                                                                                                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | User                   | id, name, roles (receiver / provider), tier (`sobat_pawon` / `food_savior` / `pahlawan_pangan`), points, saved pickup point, location                                           |
-| Listing                | id, provider_id, photo_url, name, category, portions_left, original_price, price, is_free, negotiable, pickup_by, pickup_point, lat/lng, ai_status, ai_confidence, status, created_at |
-| Offer                  | id, listing_id, receiver_id, amount, portions, status (`pending` / `accepted` / `rejected`)                                                                                     |
+| Listing                | id, provider_id, photo_url, name, category, portions_left, original_price, price, is_free, negotiable, pickup_by, pickup_point, lat/lng, delivery_fee (null = pickup only), allows_pickup (false = delivery only), ai_status, ai_confidence, health_tags, recipe (fresh ingredients), status, created_at |
+| Offer                  | id, listing_id, receiver_id, amount, portions, status (`pending` / `accepted` / `rejected`), delivery (address, lat/lng, fee; null = pickup) |
 | Conversation / Message | conversation per (listing, receiver); messages with sender, body, type (`text` / `offer` / `system`), created_at                                                                |
 | Pickup                 | id, offer_id, qr_token (one reservation, one scan), deadline (= listing `pickup_by`), status (`reserved` / `picked_up` / `expired` / `cancelled`), pay_method (`cash` / `qris`), paid_at, picked_up_at |
 | Review                 | pickup_id, rating, comment                                                                                                                                                            |
@@ -133,11 +181,18 @@ Target: 3 taps or fewer.
 ### Claim (receiver)
 
 1. Open a listing from the feed or map.
-2. Make an offer or start a chat. The provider accepts.
-3. The portions are reserved until the pickup deadline. A paid listing asks the receiver to pick how to pay
-   ("Pilih cara bayar": cash at pickup, or QRIS in the app, post-MVP). Free food skips this.
-4. The receiver walks to the pickup point ("Lihat rute"). The provider opens the reservation's QR ("Buka QR ambil").
-5. The receiver scans it ("Pindai QR") inside the pickup window. The pickup is marked `picked_up`, the receiver lands on
+2. When the provider opened delivery, pick "Ambil sendiri" or "Minta diantar" ("Cara ambil") on the detail. The
+   delivery goes to the receiver's primary saved point unless they change it, and must be within 1 km of the food. The
+   fee always comes from the listing.
+3. Take it ("Ambil") or make an offer. The choice travels with the offer, which says only "diantar": the provider
+   sees the address once the reservation exists. The provider accepts.
+4. The portions are reserved until the pickup deadline, and the choice is fixed. When food plus delivery fee is above
+   Rp0, the receiver picks how to pay ("Pilih cara bayar": cash at handover, or QRIS in the app, post-MVP). Free food
+   with free delivery skips this. A voucher only comes off the food.
+5. Pickup: the receiver walks to the pickup point ("Lihat rute"). Delivery: the provider brings the food to the
+   address ("Lihat rute antar", the same route screen with the delivery address as the destination). Either way the
+   provider opens the reservation's QR ("Buka QR ambil").
+6. The receiver scans it ("Pindai QR") inside the pickup window. The pickup is marked `picked_up`, the receiver lands on
    the review, and the provider earns points. A scan after the deadline expires the reservation and reopens the
    portions. There is no code to read out.
 

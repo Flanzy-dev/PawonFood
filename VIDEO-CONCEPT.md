@@ -15,7 +15,7 @@ If you cannot directly render or export a finished video, create the most comple
 **Product category:** Hyperlocal Community Food Rescue Platform.
 
 **Official slogan:**
-"Dari dapur ke dapur. Masak kebanyakan? Bagikan, jangan buang."
+"Dari dapur ke komunitas. Masak kebanyakan? Bagikan, jangan buang."
 
 **Primary goal:**
 Create a 20-second animated advertisement to serve as the opening sequence of a student team's two-minute hackathon pitching video.
@@ -228,7 +228,7 @@ If the real logo is provided, use it faithfully. Never replace it with an unrela
 
 Show the official slogan exactly as follows:
 
-"Dari dapur ke dapur.
+"Dari dapur ke komunitas.
 Masak kebanyakan? Bagikan, jangan buang."
 
 Keep the slogan readable on a phone screen.
@@ -327,7 +327,7 @@ The voice-over must be concise and must not repeat every on-screen text.
 
 Use this as a reference direction, not a mandatory final script:
 
-"Masak kebanyakan? Jangan biarkan makanan terbuang. PawonFood menghubungkan makanan berlebih dengan orang di sekitarmu. Temukan, pesan, ambil, dan beri makanan kesempatan kedua. PawonFood. Dari dapur ke dapur."
+"Masak kebanyakan? Jangan biarkan makanan terbuang. PawonFood menghubungkan makanan berlebih dengan orang di sekitarmu. Temukan, pesan, ambil, dan beri makanan kesempatan kedua. PawonFood. Dari dapur ke komunitas."
 
 Adjust the wording to fit the exact duration naturally.
 
@@ -345,7 +345,7 @@ Use these exact primary phrases:
 - "Jangan biarkan jadi sia-sia."
 - "Kenalkan, PawonFood."
 - "Temukan. Pesan. Ambil."
-- "Dari dapur ke dapur. Masak kebanyakan? Bagikan, jangan buang."
+- "Dari dapur ke komunitas. Masak kebanyakan? Bagikan, jangan buang."
 
 Correct spelling and legibility are essential.
 

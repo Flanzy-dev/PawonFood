@@ -115,7 +115,7 @@ Tanpa pembicara. Hanya visual, teks pendek, efek suara, dan musik. Alurnya: **ma
 - **Teks di layar:**
   - `PawonFood`
   - `Hyperlocal Community Food Rescue Platform`
-  - `Dari dapur ke dapur.`
+  - `Dari dapur ke komunitas.`
   - `Masak kebanyakan? Bagikan, jangan buang.`
 - **Transisi ke pitch:** sapuan hijau turun di 00:19,7 menyingkap kamera Pembicara 1 di latar krem, tepat di ketukan terakhir.
 - **Suara:** swell naik 00:17–00:19, satu nada penutup di 00:19,7, lalu musik turun ke -18 dB di bawah suara Pembicara 1.
@@ -171,13 +171,13 @@ Ketiga pembicara berdiri dalam satu bingkai. Masing-masing mengucapkan satu bagi
 
 | Waktu | Naskah ucapan | Visual dan overlay | Arahan |
 | --- | --- | --- | --- |
-| 01:48–01:50 | Pembicara 1: "Dari dapur ke dapur." | Bingkai tiga orang, teks slogan muncul baris 1 | Mantap, menoleh ke kamera. |
+| 01:48–01:50 | Pembicara 1: "Dari dapur ke komunitas." | Bingkai tiga orang, teks slogan muncul baris 1 | Mantap, menoleh ke kamera. |
 | 01:50–01:52 | Pembicara 2: "Masak kebanyakan?" | Baris 2 | Alis naik, seperti bertanya. |
 | 01:52–01:54 | Pembicara 3: "Bagikan, jangan buang." | Baris 3 | Menutup dengan senyum. |
 
 ## C2. End card (01:54–02:00, 6 detik)
 
-- **Visual:** latar hijau tua #203D27. Logo tungku, wordmark `PawonFood`, slogan lengkap `Dari dapur ke dapur. Masak kebanyakan? Bagikan, jangan buang.`, di bawahnya `[Nama tim] · [Universitas]` dan `[Email tim]`.
+- **Visual:** latar hijau tua #203D27. Logo tungku, wordmark `PawonFood`, slogan lengkap `Dari dapur ke komunitas. Masak kebanyakan? Bagikan, jangan buang.`, di bawahnya `[Nama tim] · [Universitas]` dan `[Email tim]`.
 - **Gerak:** sama dengan A5, logo muncul dari 60% sambil fade. Tahan diam selama 3 detik terakhir.
 - **Suara:** musik naik singkat di 01:54, fade out ke senyap di 02:00. Tanpa suara bicara.
 

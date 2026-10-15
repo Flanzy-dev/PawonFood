@@ -1,6 +1,6 @@
 # PawonFood
 
-**Dari dapur ke dapur.** *Masak kebanyakan? Bagikan, jangan buang.*
+**Dari dapur ke komunitas.** *Masak kebanyakan? Bagikan, jangan buang.*
 
 PawonFood is a hyperlocal surplus-food sharing app. It connects home kitchens, warung and ibu kos with nearby
 students, within walking distance, so edible leftovers get eaten instead of thrown away. It starts in Pogung

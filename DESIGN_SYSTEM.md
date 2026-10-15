@@ -24,7 +24,7 @@ Warm, earthy and trustworthy, like a home kitchen ("dapur rumahan").
 --map-sand:       #E8DDC9   /* map base */
 --border:         #E5DED1   /* card and chip edges, dividers (decorative) */
 --border-strong:  #8A8578   /* outline of controls: checkbox, radio, switch, text fields (3.4:1 on cream, WCAG 1.4.11) */
---accent:         #B15732   /* terracotta: "Sisa N porsi" badge, map pins, star rating, paid price pin outline */
+--accent:         #B15732   /* terracotta: "Sisa N porsi" badge, map pin ring, star rating */
 --accent-ink:     #6F2B18   /* "Bisa ditawar" pill text, "Tawar lagi" outline text */
 --success-tint:   #E3EDE4   /* tier tags, category tag, accepted-offer card */
 --camera-bg:      #111A15   /* camera / scanner screen */
@@ -50,7 +50,7 @@ Mobile scale (390pt-wide frame):
 | --- | --- | --- | --- |
 | title-xl | 28 / 34 | Bold (display) | Screen headline ("Lapar? Masih ada yang hangat di dekatmu.") |
 | title-l | 22 / 28 | Bold (display) | Detail title, big price ("Rp5.000") |
-| title-m | 18 / 24 | Semibold | Section title ("Segera habis di sekitarmu"), card title |
+| title-m | 18 / 24 | Semibold | Section title ("Pilihan untukmu di sekitar"), card title |
 | body | 15–16 / 22 | Regular | Body, inputs, chat |
 | label | 13–14 / 18 | Semibold | Chips, badges, buttons |
 | caption | 12 / 16 | Regular | Meta ("Lokasi kamu", timestamps) |
@@ -96,7 +96,7 @@ States for every interactive component: default, pressed, focused, disabled, loa
 
 - *Primary*: filled `--primary`, cream/white text, 16 radius, 52–56 tall (e.g. "Bagikan sekarang", "Ambil · Rp5.000").
 - *Outline*: white with a green outline (e.g. "Chat"). *Accent outline*: terracotta outline (e.g. "Tawar lagi").
-- *Pill CTA*: compact green pill ("Lihat peta penuh", "Lihat detail").
+- *Pill CTA*: compact green pill ("Lihat detail").
 - *Sticky bottom bar*: a white bar holding the main CTAs on detail and share screens.
 
 ### Content
@@ -113,8 +113,8 @@ States for every interactive component: default, pressed, focused, disabled, loa
 - *Price box*: sand panel showing the struck-through and current price, plus a "Bisa ditawar" pill.
 - *Quick-offer chips*: 3 equal outlined buttons (Rp3.000 / Rp4.000 / Tulis sendiri).
 - *Avatar*: green circle with cream initials (e.g. "BS").
-- *Mini-map card*: map sand background, dashed green 1 km radius, user dot, up to two price pins ("Rp5.000",
-  "Gratis"; a small dot marks the spot and the pill sits beside it, clear of the other overlays), a "Radius 1 km ·
+- *Mini-map card*: map sand background, dashed green 1 km radius, user dot, up to two food-photo pins
+  (a small dot marks the spot and the photo circle sits beside it, clear of the other overlays), a "Radius 1 km ·
   bisa jalan kaki" label and a round green 48 px button bottom-right with the
   fluent:full-screen-maximize-16-filled icon (accessible label "Lihat peta penuh").
 
@@ -187,10 +187,11 @@ confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/moti
 
 ## Map
 
-- Pins are price labels:
-  - Paid: white with a terracotta outline.
-  - Free ("Gratis"): white with a green outline.
-  - Selected: filled green.
+- Pins are the food's photo in a circle, with no price on the pin (the preview card shows it):
+  - Paid: terracotta ring.
+  - Free: green ring.
+  - Selected: a larger photo circle with a green ring.
+  - The Beranda mini-map uses the same photo circle (smaller), beside a dot on the listing's exact spot.
 - The user location is a green dot in a white ring, inside a dashed 1 km radius circle.
 - Dense areas use a cluster with a count instead of stacked pins.
 - The selected pin opens a bottom preview card (photo, name, provider · porsi · deadline, price, walking time). Tapping the card opens the detail; there is no separate button.
@@ -202,6 +203,9 @@ confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/moti
 - Tiers: **Pawon Friend → Pawon Elite → Pawon Hero**. Never use "Borjuis".
 - Category chips (Beranda and Peta, intentionally English): *All*, *Ready-to-Eat*, *Fresh Ingredient*, *Sealed Food*.
   Filters (Semua makanan only): *Bisa jalan kaki*, *Sedang hangat*, *Makan gratis*.
+- Card labels (one per card, in this priority): *Hampir habis*, *Segar* (fresh raw ingredients), *Sehat* (health tags),
+  *Populer*, *Terbaru*. Sort options on Semua makanan: *Rekomendasi*, *Terdekat*, *Segera habis*. The labels and the
+  "Pilihan sehat" / "Ide resep" sections are not in the Figma yet.
 - Prices: `Rp5.000` (dot thousands separator). Times: `20.30` (dot). Distance: `300 m`, `± 4 mnt jalan kaki`.
 
 ## Landing page
@@ -210,7 +214,7 @@ Sections of `PawonFood UI.pdf`, from top to bottom:
 
 1. **Nav**: logo; Cara kerja, Keamanan pangan, Untuk warung, Tentang; pill CTA "Unduh aplikasi".
 2. **Hero** on `--primary-dark`:
-   - Eyebrow "Dari dapur ke dapur · Yogyakarta".
+   - Eyebrow "Dari dapur ke komunitas · Yogyakarta".
    - Display headline "Masak kebanyakan? Bagikan, jangan buang." and a short explanation paragraph.
    - CTAs "Unduh aplikasi" / "Daftar jadi penyedia" with the line "Setiap foto makanan dicek AI sebelum tayang".
    - Phone mockup of the home screen.
@@ -224,7 +228,7 @@ Sections of `PawonFood UI.pdf`, from top to bottom:
    - Headline "Sisa dagangan jadi pemasukan, bukan sampah".
    - 3 benefits (jual sisa, tampil teratas, sertifikat) and the CTA "Daftarkan warungmu".
    - Photo placeholders.
-8. **Final CTA**: "Dari dapur ke dapur, dalam jarak jalan kaki." with App Store / Google Play buttons.
+8. **Final CTA**: "Dari dapur ke komunitas, dalam jarak jalan kaki." with App Store / Google Play buttons.
 9. **Footer**: Produk / Mitra / Tentang link columns, © 2026 PawonFood.
 
 ## Responsive
