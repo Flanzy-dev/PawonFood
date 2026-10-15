@@ -55,6 +55,28 @@ Decision rule (identical on device and in the optional server validator):
 Optional server-side validator: a small Python service running the same `ultralytics` model with the same rule.
 It re-checks uploads when the backend exists.
 
+### Cloud vision validator (built)
+
+`app/server/` is a dependency-free Node service with `POST /v1/food-validation`. It sends the photo to a Qwen vision
+model (Alibaba Cloud Model Studio, OpenAI-compatible API) and runs a rules layer on the answer. The app uses it when
+built with `--dart-define=PAWON_VALIDATOR_URL=...`; otherwise it keeps the simulated validator. The model key stays on
+the server.
+
+- **Qwen only observes.** It returns `is_food`, `category`, `food_name`, `visual_condition`, `visible_signs`,
+  `image_quality` and `warnings`. It gives no scores, no expiry dates and no safety claims.
+- **The server decides** `listing_eligible` and `decision`:
+
+| Condition                                                   | Decision          |
+| ----------------------------------------------------------- | ----------------- |
+| Not food (`is_food` false or `bukan_makanan`)               | `rejected`        |
+| Image not `good`, or condition `cannot_assess`              | `retake`          |
+| `visible_spoilage` (mould, rot, insects)                    | `rejected`        |
+| `unknown` category or `minor_concerns`                      | `pending_review`  |
+| Otherwise                                                   | `approved`        |
+
+A failed or malformed check never approves a photo. The visual check does not certify food safety; the provider
+guarantee stays. Setup, deployment and limits are in `app/server/README.md`.
+
 ## Project structure
 
 ```text
