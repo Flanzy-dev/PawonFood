@@ -3,8 +3,13 @@
 **Dari dapur ke dapur.** *Masak kebanyakan? Bagikan, jangan buang.*
 
 PawonFood is a hyperlocal surplus-food sharing app. It connects home kitchens, warung and ibu kos with nearby
-students, within walking distance, so edible leftovers get eaten instead of thrown away. It starts in Pogung
-(Sleman, near UGM) and is meant to grow to all of Yogyakarta.
+students, within walking distance, so edible leftovers get eaten instead of thrown away.
+
+This idea was proposed and developed collaboratively by Computer Science students at Binus University, including:
+Raditya Christiano Aravajordan - 2902649234, 
+Daniel Isaac Ismanto - 2902587362,
+Muhammad Cesar Maulana - 2902733232.
+
 
 Built for a UGM sustainability hackathon. It supports SDG 2 (Zero Hunger) and SDG 12 (Responsible Consumption).
 
