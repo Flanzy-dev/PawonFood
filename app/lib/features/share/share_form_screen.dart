@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -42,8 +43,15 @@ class ShareFormScreen extends ConsumerStatefulWidget {
 }
 
 class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
-  late final TextEditingController _name;
+  final _name = TextEditingController();
+  final _description = TextEditingController();
   final _price = TextEditingController(text: '5.000');
+
+  /// Fields the provider changed by hand. The AI answer arrives in the background and only fills the rest.
+  var _nameEdited = false;
+  var _descriptionEdited = false;
+  var _categoryEdited = false;
+  var _tagsEdited = false;
   /// Null until picked when the AI could not tell the category.
   FoodCategory? _category;
   var _portions = 2;
@@ -69,7 +77,7 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   var _published = false;
 
   /// "Pilihan sehat": pre-selected from what the AI saw, then confirmed by the provider.
-  late final Set<HealthTag> _healthTags;
+  final _healthTags = <HealthTag>{};
 
   /// "Ide resep" (fresh ingredients only): the attached recipe, and ideas asked from the AI.
   Recipe? _recipe;
@@ -79,10 +87,7 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   @override
   void initState() {
     super.initState();
-    final capture = ref.read(shareCaptureProvider);
-    _name = TextEditingController(text: capture?.result.suggestedName ?? '');
-    _category = capture?.result.category;
-    _healthTags = {...?capture?.result.suggestedHealthTags};
+    _fillFromAi(ref.read(shareCaptureProvider));
     _times = suggestPickupTimes(ref.read(clockProvider)());
     _pickupBy = _times[1];
   }
@@ -90,8 +95,24 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   @override
   void dispose() {
     _name.dispose();
+    _description.dispose();
     _price.dispose();
     super.dispose();
+  }
+
+  /// Pre-fills name, description, category and health tags from the AI answer, except what the provider already set.
+  /// A rejected photo fills nothing: the provider has to retake it.
+  void _fillFromAi(ShareCapture? capture) {
+    final r = capture?.result;
+    if (r == null || !r.eligible) return;
+    if (!_nameEdited && r.suggestedName != null) _name.text = r.suggestedName!;
+    if (!_descriptionEdited && r.suggestedDescription != null) _description.text = r.suggestedDescription!;
+    if (!_categoryEdited) _category = r.category;
+    if (!_tagsEdited) {
+      _healthTags
+        ..clear()
+        ..addAll(r.suggestedHealthTags);
+    }
   }
 
   /// "Atur jam": a time picker for the latest pickup time (30 minutes to 6 hours from now).
@@ -108,11 +129,16 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   void _publish() {
     if (_published) return; // a second tap during the page transition must not publish twice
     final capture = ref.read(shareCaptureProvider);
+    if (capture != null && capture.checking) {
+      setState(() => _formError = 'AI masih memeriksa foto. Tunggu sebentar, lalu bagikan.');
+      return;
+    }
     // Only a photo the AI passed (or sent to manual review) can be published; a failed or missing check never can.
-    if (capture == null || !capture.result.eligible) {
+    if (capture == null || !capture.eligible) {
       setState(() => _formError = 'Foto belum lolos pengecekan AI. Kembali ke kamera untuk foto ulang.');
       return;
     }
+    final aiResult = capture.result!;
     final price = _free ? 0 : parseAmount(_price.text);
     setState(() {
       _nameError = _name.text.trim().isEmpty ? 'Nama makanan wajib diisi' : null;
@@ -131,7 +157,8 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
           PublishDraft(
             name: _name.text,
             category: _category!,
-            aiCategory: capture.result.category,
+            description: _description.text.trim().isEmpty ? null : _description.text.trim(),
+            aiCategory: aiResult.category,
             portions: _portions,
             price: price!,
             negotiable: !_free && _negotiable,
@@ -144,8 +171,8 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
             deliveryFee: _delivery ? _deliveryFee : null,
             allowsPickup: _pickup,
             photoPath: capture.photoPath,
-            aiConfidence: capture.result.confidence,
-            aiStatus: capture.result.verdict == AiVerdict.approved ? AiStatus.approved : AiStatus.pendingReview,
+            aiConfidence: aiResult.confidence,
+            aiStatus: aiResult.verdict == AiVerdict.approved ? AiStatus.approved : AiStatus.pendingReview,
           ),
         );
     if (result.error != null) {
@@ -196,6 +223,7 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
           void pick(FoodCategory c) {
             setState(() {
               _category = c;
+              _categoryEdited = true;
               _categoryError = null;
             });
             setSheet(() {});
@@ -287,15 +315,69 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
     );
   }
 
+  /// The AI line in the photo card: running, passed, waiting for review, or a photo that cannot be shared.
+  Widget _aiStatus(ShareCapture? capture) {
+    final (IconData? icon, String text, Color color) = switch (capture) {
+      null => (LucideIcons.triangleAlert, 'Foto belum dicek AI', AppColors.error),
+      ShareCapture(checking: true) => (null, 'AI sedang mengenali makanan...', AppColors.inkMuted),
+      ShareCapture(failure: != null) => (LucideIcons.wifiOff, 'Pemeriksaan AI gagal', AppColors.error),
+      ShareCapture(eligible: false) => (LucideIcons.triangleAlert, 'Foto belum lolos', AppColors.error),
+      ShareCapture(result: ValidationResult(verdict: AiVerdict.pendingReview)) => (LucideIcons.clock, 'Menunggu tinjauan manual', AppColors.primary),
+      _ => (LucideIcons.shieldCheck, 'Foto lolos validasi', AppColors.primary),
+    };
+    // The answer arrives after the page opened, so a screen reader is told when it changes.
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Row(children: [
+        if (icon == null && !Motion.reduced(context))
+          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary))
+        else
+          Icon(icon ?? LucideIcons.scanEye, size: 18, color: color),
+        const SizedBox(width: 6),
+        Flexible(child: Text(text, style: AppTypography.text(13, weight: 600))),
+      ]),
+    );
+  }
+
+  /// A photo the AI turned down (retake, not food, spoilage) or could not check: what happened and how to go on.
+  Widget _problem(ShareCapture capture) {
+    final r = capture.result;
+    final failed = r == null;
+    final signs = r?.visibleSigns ?? const <String>[];
+    final text = failed
+        ? '${validationFailureText(capture.failure)} Foto belum dianggap lolos.'
+        : [r.message ?? msgNotFood, if (signs.isNotEmpty) 'Terlihat: ${signs.join(', ')}.'].join('\n');
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      InfoBox(
+        text,
+        title: failed ? 'Pemeriksaan AI gagal' : (r.verdict == AiVerdict.retake ? 'Foto kurang jelas' : 'Foto tidak bisa dipakai'),
+        icon: failed ? LucideIcons.wifiOff : (r.verdict == AiVerdict.retake ? LucideIcons.focus : LucideIcons.x),
+        iconColor: AppColors.error,
+      ),
+      const SizedBox(height: 10),
+      if (failed) ...[
+        AppButton(label: 'Coba lagi', variant: AppButtonVariant.outline, onPressed: () => ref.read(shareCaptureProvider.notifier).retry()),
+        const SizedBox(height: 10),
+      ],
+      AppButton(label: 'Foto ulang', variant: failed ? AppButtonVariant.ghost : AppButtonVariant.outline, onPressed: () => context.canPop() ? context.pop() : context.go('/share/camera')),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // The AI answer arrives while this form is open: fill the fields the provider has not touched yet.
+    ref.listen(shareCaptureProvider, (_, next) {
+      if (next != null && next.eligible) setState(() => _fillFromAi(next));
+    });
     final capture = ref.watch(shareCaptureProvider);
     final now = ref.watch(clockProvider)();
-    final pending = capture?.result.verdict == AiVerdict.pendingReview;
-    final checked = capture != null && capture.result.eligible;
-    final notes = [...?capture?.result.visibleSigns, ...?capture?.result.warnings];
+    final result = capture?.result;
+    final pending = result?.verdict == AiVerdict.pendingReview;
+    final checked = capture != null && capture.eligible;
+    final notes = [...?result?.visibleSigns, ...?result?.warnings];
     // The reason is only worth repeating when it says more than "Foto lolos validasi".
-    final reason = pending ? capture?.result.message : null;
+    final reason = pending ? result?.message : null;
 
     return Scaffold(
       body: Column(
@@ -350,11 +432,7 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                                 ),
                               ]),
                               const SizedBox(height: 2),
-                              Row(children: [
-                                Icon(!checked ? LucideIcons.triangleAlert : (pending ? LucideIcons.clock : LucideIcons.shieldCheck), size: 18, color: checked ? AppColors.primary : AppColors.error),
-                                const SizedBox(width: 6),
-                                Flexible(child: Text(!checked ? 'Foto belum dicek AI' : (pending ? 'Menunggu tinjauan manual' : 'Foto lolos validasi'), style: AppTypography.text(13, weight: 600))),
-                              ]),
+                              _aiStatus(capture),
                               if (_categoryError != null) ...[
                                 const SizedBox(height: 4),
                                 Text(_categoryError!, style: AppTypography.text(13, weight: 600, color: AppColors.error)),
@@ -365,6 +443,10 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                       ],
                     ),
                   ),
+                  if (capture != null && !capture.checking && !checked) ...[
+                    const SizedBox(height: 12),
+                    _problem(capture),
+                  ],
                   if (checked && (notes.isNotEmpty || reason != null)) ...[
                     const SizedBox(height: 12),
                     InfoBox(
@@ -374,7 +456,22 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  AppTextField(label: 'Nama makanan', controller: _name, errorText: _nameError, hint: 'Contoh: Ayam goreng', textCapitalization: TextCapitalization.sentences, onChanged: (_) => setState(() => _nameError = null)),
+                  AppTextField(label: 'Nama makanan', controller: _name, errorText: _nameError, hint: 'Contoh: Ayam goreng', textCapitalization: TextCapitalization.sentences, onChanged: (_) => setState(() {
+                    _nameEdited = true;
+                    _nameError = null;
+                  })),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    label: 'Deskripsi',
+                    controller: _description,
+                    hint: 'Contoh: Ayam goreng bumbu kuning, 4 potong',
+                    textCapitalization: TextCapitalization.sentences,
+                    maxLines: 3,
+                    keyboardType: TextInputType.multiline,
+                    inputFormatters: [LengthLimitingTextInputFormatter(descriptionMaxLength)],
+                    helperText: 'Maksimal $descriptionMaxLength karakter',
+                    onChanged: (_) => _descriptionEdited = true,
+                  ),
                   const SizedBox(height: 16),
                   Row(children: [
                     Expanded(child: Text('Sisa berapa porsi?', style: AppTypography.display(17, weight: 700))),
@@ -387,7 +484,10 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                   const SizedBox(height: 10),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     for (final t in HealthTag.values)
-                      AppChip(label: t.label, selected: _healthTags.contains(t), onTap: () => setState(() => _healthTags.contains(t) ? _healthTags.remove(t) : _healthTags.add(t))),
+                      AppChip(label: t.label, selected: _healthTags.contains(t), onTap: () => setState(() {
+                          _tagsEdited = true;
+                          _healthTags.contains(t) ? _healthTags.remove(t) : _healthTags.add(t);
+                        })),
                   ]),
                   if (_category == FoodCategory.bahanMentah) _recipeSection(),
                   const SizedBox(height: 16),
@@ -510,7 +610,8 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                   Text('Dengan membagikan, kamu menjamin makanan ini masih layak makan.', textAlign: TextAlign.center, style: AppTypography.text(13, height: 18, color: AppColors.inkMuted)),
                   const SizedBox(height: 14),
                 ],
-                AppButton(label: 'Bagikan sekarang', onPressed: _publish),
+                // Off while the AI is still looking or turned the photo down: the reason is already on screen above.
+                AppButton(label: 'Bagikan sekarang', onPressed: capture == null || capture.eligible ? _publish : null),
               ],
             ),
           ),

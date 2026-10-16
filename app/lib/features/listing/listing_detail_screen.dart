@@ -164,7 +164,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                           right: 0,
                           height: 120,
                           child: DecoratedBox(
-                            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x73111A15), Color(0x00111A15)])),
+                            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.scrimTop, AppColors.scrimClear])),
                           ),
                         ),
                         Positioned(

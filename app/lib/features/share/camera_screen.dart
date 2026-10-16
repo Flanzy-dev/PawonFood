@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/data/providers.dart';
-import '../../core/motion/motion_widgets.dart';
+import '../../core/motion/motion.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/food_validator.dart';
 import '../../core/theme/app_colors.dart';
@@ -20,12 +20,11 @@ import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/pills.dart';
 import 'share_state.dart';
 
-/// `rejected` covers both a rejected photo and one to retake; `failed` is a photo the AI could not check.
-enum _Phase { starting, scanning, ready, capturing, rejected, failed, denied, unavailable }
+enum _Phase { starting, ready, capturing, denied, unavailable }
 
-/// Step 1 of 3 (C12–C14): live camera with the AI scan. Camera only, never a gallery picker.
-/// Long-press the title to choose the simulated AI result (demo mode). With the cloud validator there is no live
-/// detection: the photo is checked after the shutter.
+/// Step 1 of 3 (C12–C14): a plain camera, never a gallery picker. The AI check runs in the background once the photo
+/// is taken (see [ShareCaptureNotifier]) and fills in the form; there is no scan effect here.
+/// Long-press the title to choose the simulated AI result (demo mode, simulated validator only).
 class CameraScreen extends ConsumerStatefulWidget {
   const CameraScreen({super.key});
 
@@ -36,13 +35,7 @@ class CameraScreen extends ConsumerStatefulWidget {
 class _CameraScreenState extends ConsumerState<CameraScreen> {
   late final AppCamera _camera = ref.read(cameraFactoryProvider)();
   late final bool _cloud = ref.read(cloudValidatorProvider);
-  Timer? _readyTimer;
   var _phase = _Phase.starting;
-  ValidationResult? _rejection;
-  ValidationFailure? _failure;
-
-  /// The photo whose check failed, so "Coba lagi" re-checks it without a new shot.
-  String? _failedPath;
 
   @override
   void initState() {
@@ -52,7 +45,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
 
   @override
   void dispose() {
-    _readyTimer?.cancel();
     unawaited(_camera.dispose());
     super.dispose();
   }
@@ -64,25 +56,16 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
 
   void _apply(CameraStatus status) {
     if (!mounted) return;
-    switch (status) {
-      case CameraStatus.ready when _cloud:
-        setState(() => _phase = _Phase.ready);
-      case CameraStatus.ready:
-        setState(() => _phase = _Phase.scanning);
-        // Simulated live detection: the box appears shortly after the camera is ready.
-        _readyTimer?.cancel();
-        _readyTimer = Timer(const Duration(milliseconds: 1200), () {
-          if (mounted && _phase == _Phase.scanning) setState(() => _phase = _Phase.ready);
+    setState(() => _phase = switch (status) {
+          CameraStatus.ready => _Phase.ready,
+          CameraStatus.denied => _Phase.denied,
+          CameraStatus.unavailable => _Phase.unavailable,
         });
-      case CameraStatus.denied:
-        setState(() => _phase = _Phase.denied);
-      case CameraStatus.unavailable:
-        setState(() => _phase = _Phase.unavailable);
-    }
   }
 
+  /// Takes the photo, starts the AI check without waiting for it and opens the form right away.
   Future<void> _capture() async {
-    if (_phase != _Phase.scanning && _phase != _Phase.ready) return;
+    if (_phase != _Phase.ready) return;
     setState(() => _phase = _Phase.capturing);
     final String path;
     try {
@@ -93,43 +76,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       showAppSnack(context, 'Foto gagal diambil. Coba lagi.');
       return;
     }
-    await _validate(path);
-  }
-
-  /// Checks [path]. Only an eligible result moves on to the form; a failure never counts as validated.
-  Future<void> _validate(String path) async {
-    setState(() => _phase = _Phase.capturing);
-    final ValidationResult result;
-    try {
-      result = await ref.read(foodValidatorProvider).validate(path);
-    } on Object catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _phase = _Phase.failed;
-        _failure = e is ValidationUnavailable ? e.failure : ValidationFailure.badResponse;
-        _failedPath = path;
-      });
-      return;
-    }
     if (!mounted) return;
-    if (!result.eligible) {
-      setState(() {
-        _phase = _Phase.rejected;
-        _rejection = result;
-      });
-      return;
-    }
-    ref.read(shareCaptureProvider.notifier).state = ShareCapture(photoPath: path, result: result);
+    unawaited(ref.read(shareCaptureProvider.notifier).start(path));
     await context.push('/share/form');
     if (mounted) setState(() => _phase = _Phase.ready);
   }
-
-  void _retake() => setState(() {
-        _phase = _Phase.ready;
-        _rejection = null;
-        _failure = null;
-        _failedPath = null;
-      });
 
   Future<void> _flip() async {
     setState(() => _phase = _Phase.starting);
@@ -210,28 +161,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     );
   }
 
-  ({String label, bool error}) _liveDetection(DemoAiMode m) => switch (m) {
-        DemoAiMode.rawIngredients => (label: 'Bahan mentah', error: false),
-        DemoAiMode.notFood => (label: 'Bukan makanan', error: true),
-        // Blur, spoilage and a server failure only show once the photo is checked.
-        DemoAiMode.normal || DemoAiMode.lowConfidence || DemoAiMode.blurry || DemoAiMode.spoiled || DemoAiMode.serverDown => (label: 'Lauk matang', error: false),
-      };
-
-  /// Label on the red box for a photo that did not pass.
-  String _rejectionLabel(ValidationResult? r) {
-    if (r?.verdict == AiVerdict.retake) return 'Foto kurang jelas';
-    if (r?.visualCondition == VisualCondition.visibleSpoilage) return 'Ada tanda tidak layak';
-    return 'Bukan makanan';
-  }
-
-  String _failureText(ValidationFailure? f) => switch (f) {
-        ValidationFailure.rateLimited => 'Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.',
-        ValidationFailure.uploadRejected => 'Foto ini tidak bisa diperiksa. Coba foto ulang.',
-        ValidationFailure.timeout => 'Pemeriksaan terlalu lama. Periksa koneksi internet, lalu coba lagi.',
-        ValidationFailure.serverError => 'Pemeriksaan foto sedang bermasalah. Coba lagi sebentar lagi.',
-        _ => 'Foto belum bisa diperiksa. Periksa koneksi internet, lalu coba lagi.',
-      };
-
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
@@ -304,18 +233,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
   }
 
   Widget _body() {
-    // The cloud validator has no live detection, so no box is drawn before the photo is checked.
-    final live = _cloud ? null : _liveDetection(ref.watch(demoAiModeProvider));
-    final rejected = _phase == _Phase.rejected;
-    final failed = _phase == _Phase.failed;
-    final scanning = _phase == _Phase.starting || _phase == _Phase.scanning || _phase == _Phase.capturing;
-    final liveReady = _phase == _Phase.ready && live != null;
-    final showBox = liveReady || rejected;
-    final notFoodLive = liveReady && live.error;
-    final error = rejected || notFoodLive;
-    final label = rejected ? _rejectionLabel(_rejection) : (live?.label ?? '');
-    final detected = liveReady && !live.error;
-
     return Column(
       children: [
         Expanded(
@@ -326,125 +243,29 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
               children: [
                 const ColoredBox(color: AppColors.cameraLine),
                 if (_phase != _Phase.starting) _camera.buildPreview(),
-                const ColoredBox(color: Color(0x2E111A15)),
-                LayoutBuilder(
-                  builder: (context, c) {
-                    final side = c.maxWidth * 0.72;
-                    final left = (c.maxWidth - side) / 2;
-                    final top = c.maxHeight * 0.2;
-                    return Stack(children: [
-                      if (showBox) ...[
-                        Positioned(
-                          left: left,
-                          top: top,
-                          width: side,
-                          height: side,
-                          child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: error ? AppColors.error : AppColors.detectBox, width: 3))),
-                        ),
-                        Positioned(
-                          left: left,
-                          top: top - 36,
-                          child: Pill(label, fill: error ? AppColors.error : AppColors.detectBox, color: error ? AppColors.background : AppColors.primaryDark, height: 32, size: 15, weight: 700, hPad: 14),
-                        ),
-                      ],
-                      if (scanning)
-                        // Positioned stays put; only a translate moves, so the sweep never re-lays-out the stack.
-                        Positioned(
-                          left: 28,
-                          right: 28,
-                          top: c.maxHeight * 0.18,
-                          child: LoopAnimation(
-                            duration: const Duration(milliseconds: 1500),
-                            builder: (_, t, child) => Transform.translate(offset: Offset(0, c.maxHeight * 0.5 * t), child: child),
-                            child: Container(height: 4, decoration: BoxDecoration(color: AppColors.detectBox, borderRadius: BorderRadius.circular(2), boxShadow: const [BoxShadow(color: AppColors.detectBox, blurRadius: 12)])),
-                          ),
-                        ),
-                    ]);
-                  },
-                ),
-                if (scanning) const Positioned(top: 16, left: 16, child: Pill('AI sedang memindai...', fill: AppColors.primaryDark, color: AppColors.background, height: 32, size: 14, hPad: 14)),
-                const Positioned(left: 16, bottom: 16, child: Pill('Pratinjau kamera', fill: Color(0xC7111A15), color: AppColors.surfaceSand, height: 32, size: 14, weight: 500, hPad: 14)),
+                const ColoredBox(color: AppColors.scrimDim),
+                const Positioned(left: 16, bottom: 16, child: Pill('Pratinjau kamera', fill: AppColors.scrimLabel, color: AppColors.surfaceSand, height: 32, size: 14, weight: 500, hPad: 14)),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
-        _status(rejected: rejected, failed: failed, detected: detected, notFoodLive: notFoodLive),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Arahkan kamera ke makanan', style: AppTypography.display(22, height: 27, color: AppColors.background)),
+              const SizedBox(height: 4),
+              Text('Pastikan makanan terlihat jelas dan cahaya cukup.', style: AppTypography.text(14, color: AppColors.cameraText)),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
-        if (rejected)
-          AppButton(label: 'Foto ulang', variant: AppButtonVariant.light, onPressed: _retake)
-        else if (failed) ...[
-          AppButton(label: 'Coba lagi', variant: AppButtonVariant.light, onPressed: _failedPath == null ? null : () => _validate(_failedPath!)),
-          const SizedBox(height: 10),
-          AppButton(label: 'Foto ulang', variant: AppButtonVariant.ghost, onPressed: _retake),
-        ] else
-          _controls(),
+        _controls(),
       ],
     );
   }
-
-  Widget _status({required bool rejected, required bool failed, required bool detected, required bool notFoodLive}) {
-    Widget icon(IconData i, Color bg, Color fg) => Container(width: 44, height: 44, decoration: BoxDecoration(color: bg, shape: BoxShape.circle), child: Icon(i, size: 24, color: fg));
-    if (rejected) {
-      final r = _rejection;
-      final signs = r?.visibleSigns ?? const <String>[];
-      return _statusRow(
-        icon(r?.verdict == AiVerdict.retake ? LucideIcons.focus : LucideIcons.x, AppColors.errorLight, AppColors.cameraBg),
-        r?.message ?? msgNotFood,
-        switch (r) {
-          ValidationResult(verdict: AiVerdict.retake) => 'Taruh makanan di tengah dan pastikan cahaya cukup.',
-          _ when signs.isNotEmpty => 'Terlihat: ${signs.join(', ')}.',
-          _ => 'Foto dari galeri atau internet tidak bisa dipakai.',
-        },
-        AppColors.errorLight,
-      );
-    }
-    if (failed) {
-      return _statusRow(
-        icon(LucideIcons.wifiOff, AppColors.cameraControl, AppColors.background),
-        'Pemeriksaan AI gagal',
-        '${_failureText(_failure)} Foto belum dianggap lolos.',
-        AppColors.background,
-      );
-    }
-    if (detected) {
-      return _statusRow(
-        icon(LucideIcons.check, AppColors.successTint, AppColors.primary),
-        'Makanan terdeteksi, siap difoto',
-        'Foto hanya bisa diambil langsung dari kamera, bukan dari galeri. Ini yang bikin penerima percaya makananmu asli.',
-        AppColors.background,
-      );
-    }
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(notFoodLive ? 'Belum terlihat makanan' : 'Arahkan kamera ke makanan', style: AppTypography.display(22, height: 27, color: AppColors.background)),
-          const SizedBox(height: 4),
-          Text(notFoodLive ? 'Arahkan kamera ke makanan, ya.' : 'Pastikan makanan terlihat jelas dan cahaya cukup.', style: AppTypography.text(14, color: AppColors.cameraText)),
-        ],
-      ),
-    );
-  }
-
-  Widget _statusRow(Widget icon, String title, String body, Color titleColor) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          icon,
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTypography.display(19, height: 24, color: titleColor)),
-                const SizedBox(height: 4),
-                Text(body, maxLines: 4, overflow: TextOverflow.ellipsis, style: AppTypography.text(13, height: 19, color: AppColors.cameraText)),
-              ],
-            ),
-          ),
-        ],
-      );
 
   Widget _controls() {
     final busy = _phase == _Phase.capturing || _phase == _Phase.starting;
@@ -488,7 +309,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
                 child: Container(
                   alignment: Alignment.center,
                   decoration: BoxDecoration(color: busy ? AppColors.cameraText : AppColors.background, shape: BoxShape.circle),
-                  child: busy ? const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.primary)) : const PawonLogo(size: 36, color: AppColors.primary),
+                  child: busy && !Motion.reduced(context) ? const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.primary)) : const PawonLogo(size: 36, color: AppColors.primary),
                 ),
               ),
             ),

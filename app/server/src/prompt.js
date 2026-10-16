@@ -9,6 +9,8 @@ Return exactly these keys:
   "is_food": boolean,            // true only if the main subject is food or a food ingredient
   "category": string,            // one of: "makanan_matang", "bahan_mentah", "makanan_kemasan", "bukan_makanan", "unknown"
   "food_name": string | null,    // short Indonesian name of the visible food, e.g. "Ayam goreng", "Sayur bayam"; null if not food
+  "description": string | null,  // one short Indonesian sentence (under 140 characters) about what is visible: the dish,
+                                 // the pieces or portion, how it is served, e.g. "Ayam goreng bumbu kuning, 4 potong."; null if not food
   "visual_condition": string,    // one of: "no_visible_issues", "minor_concerns", "visible_spoilage", "cannot_assess"
   "visible_signs": string[],     // short Indonesian phrases for signs you can actually see, e.g. "jamur putih di permukaan"
   "image_quality": string,       // one of: "good", "blurry", "too_dark", "obstructed", "too_far"
@@ -38,6 +40,7 @@ Rules:
   meat, fish, egg, tofu or tempeh, "digoreng" when something looks deep-fried, "direbus_kukus" when the food looks
   boiled, steamed or served in a clear soup. Use [] when the photo is not food or nothing applies. These are
   observations, not a health rating.
+- "description" only states what is visible. It never says the food is fresh, safe, tasty or how old it is.
 - Never give confidence percentages, scores, expiry dates or a shelf life.
 - Never state or imply that the food is safe, fresh or fit to eat. You describe; you do not certify.
 - Keep each list to at most 5 items, each under 60 characters. Use [] when there is nothing to report.`;

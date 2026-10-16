@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MAX_NOTES, ModelResponseError, parseModelOutput } from '../src/schema.js';
+import { MAX_DESCRIPTION_LENGTH, MAX_NOTES, ModelResponseError, parseModelOutput } from '../src/schema.js';
 import { observation } from './helpers.js';
 
 const parse = (o) => parseModelOutput(typeof o === 'string' ? o : JSON.stringify(o));
@@ -43,6 +43,17 @@ test('food_name is cleared for non-food and cut to 60 characters', () => {
   assert.equal(parse(observation({ is_food: false, category: 'bukan_makanan', food_name: 'Kursi' })).food_name, null);
   assert.equal(parse(observation({ food_name: 'n'.repeat(100) })).food_name.length, 60);
   assert.equal(parse(observation({ food_name: '   ' })).food_name, null);
+});
+
+test('description: optional, trimmed, cut to 160, cleared for non-food, claims and scores dropped', () => {
+  assert.equal(parse(observation({ description: '  Nasi dan  ayam. ' })).description, 'Nasi dan ayam.');
+  assert.equal(parse(observation({ description: 'd'.repeat(300) })).description.length, MAX_DESCRIPTION_LENGTH);
+  assert.equal(parse(observation({ description: '   ' })).description, null);
+  assert.equal(parse({ ...observation(), description: undefined }).description, null, 'older prompts send none');
+  assert.equal(parse(observation({ description: 'Ayam goreng, aman dikonsumsi.' })).description, null);
+  assert.equal(parse(observation({ description: 'Ayam goreng 95% matang.' })).description, null);
+  assert.equal(parse(observation({ is_food: false, category: 'bukan_makanan', description: 'Sebuah kursi.' })).description, null);
+  assert.throws(() => parse(observation({ description: 12 })), ModelResponseError);
 });
 
 test('malformed answers are errors, never defaults', () => {

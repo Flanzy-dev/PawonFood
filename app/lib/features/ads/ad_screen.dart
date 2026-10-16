@@ -113,7 +113,7 @@ class _AdScreenState extends ConsumerState<AdScreen> with SingleTickerProviderSt
               ),
               const DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: [0.25, 0.9], colors: [Color(0x00111A15), Color(0xE6111A15)]),
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: [0.25, 0.9], colors: [AppColors.scrimClear, AppColors.scrimBottom]),
                 ),
               ),
               if (_video) ...[

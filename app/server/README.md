@@ -109,6 +109,7 @@ multipart. The image is held in memory for the request only. It is never written
   "is_food": true,
   "category": "makanan_matang",
   "food_name": "Ayam goreng",
+  "description": "Ayam goreng bumbu kuning, beberapa potong paha dan dada.",
   "visual_condition": "no_visible_issues",
   "visible_signs": [],
   "image_quality": "good",

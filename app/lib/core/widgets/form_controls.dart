@@ -347,9 +347,13 @@ class AppTextField extends StatefulWidget {
     this.autofocus = false,
     this.textCapitalization = TextCapitalization.none,
     this.semanticLabel,
+    this.maxLines = 1,
   });
 
   final String label;
+
+  /// Height of the field in lines; above 1 it becomes a multi-line note.
+  final int maxLines;
 
   /// Name read by screen readers when the visible [label] is empty or not enough (e.g. the price field).
   final String? semanticLabel;
@@ -395,6 +399,7 @@ class _AppTextFieldState extends State<AppTextField> {
           focusNode: widget.focusNode,
           autofocus: widget.autofocus,
           obscureText: _obscured,
+          maxLines: _obscured ? 1 : widget.maxLines,
           keyboardType: widget.keyboardType,
           textInputAction: widget.textInputAction,
           textCapitalization: widget.textCapitalization,

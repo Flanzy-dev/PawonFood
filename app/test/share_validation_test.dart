@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +9,8 @@ import 'package:pawonfood/core/data/providers.dart';
 import 'package:pawonfood/core/models/enums.dart';
 import 'package:pawonfood/core/services/camera_service.dart';
 import 'package:pawonfood/core/services/food_validator.dart';
+import 'package:pawonfood/core/services/validators.dart';
+import 'package:pawonfood/core/widgets/app_button.dart';
 import 'package:pawonfood/core/theme/app_theme.dart';
 import 'package:pawonfood/features/share/camera_screen.dart';
 import 'package:pawonfood/features/share/share_form_screen.dart';
@@ -54,10 +58,27 @@ class ScriptedValidator implements FoodValidator {
 
 const approved = ValidationResult(verdict: AiVerdict.approved, category: FoodCategory.makananMatang, suggestedName: 'Ayam goreng', message: 'Foto lolos validasi');
 
+/// Answers only when the test completes it, so the form can be seen while the check is still running.
+class SlowValidator implements FoodValidator {
+  final answer = Completer<ValidationResult>();
+
+  @override
+  Future<ValidationResult> validate(String imagePath) => answer.future;
+}
+
+/// A capture that is already in place when the form opens.
+class FixedCapture extends ShareCaptureNotifier {
+  FixedCapture(this.initial);
+  final ShareCapture? initial;
+
+  @override
+  ShareCapture? build() => initial;
+}
+
 void main() {
   setUpAll(loadAppFonts);
 
-  Future<ProviderContainer> pumpShare(WidgetTester tester, {required List<Override> overrides, String initial = '/share/camera'}) async {
+  Future<ProviderContainer> pumpShare(WidgetTester tester, {required List<Override> overrides, String initial = '/share/camera', bool settle = true}) async {
     usePhoneScreen(tester);
     final router = GoRouter(initialLocation: initial, routes: [
       GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('Beranda'))),
@@ -66,10 +87,14 @@ void main() {
       GoRoute(path: '/share/done/:id', builder: (_, s) => Scaffold(body: Text('done ${s.pathParameters['id']}'))),
     ]);
     await tester.pumpWidget(ProviderScope(overrides: [...testOverrides(), ...overrides], child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router)));
-    await tester.pump(const Duration(seconds: 2)); // camera start + the simulated live detection
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2)); // camera start
+    // A check that is still running keeps the spinner turning, so such a test cannot wait for the screen to settle.
+    if (settle) await tester.pumpAndSettle();
     return ProviderScope.containerOf(tester.element(find.byType(Scaffold).first));
   }
+
+  /// Whether "Bagikan sekarang" is switched off.
+  bool publishDisabled(WidgetTester tester) => tester.widget<AppButton>(find.widgetWithText(AppButton, 'Bagikan sekarang')).onPressed == null;
 
   Future<void> shoot(WidgetTester tester) async {
     await tester.tap(find.bySemanticsLabel('Ambil foto'));
@@ -77,15 +102,52 @@ void main() {
   }
 
   group('camera (step 1)', () {
-    testWidgets('a blurry photo asks for a retake and does not open the form', (tester) async {
+    testWidgets('is a plain camera: no scan effect or detection box, in either mode', (tester) async {
+      for (final cloud in [false, true]) {
+        await pumpShare(tester, overrides: [
+          cameraFactoryProvider.overrideWithValue(FakeCamera.new),
+          cloudValidatorProvider.overrideWithValue(cloud),
+          foodValidatorProvider.overrideWithValue(ScriptedValidator([approved])),
+        ]);
+        expect(find.text('Arahkan kamera ke makanan'), findsOneWidget);
+        expect(find.text('AI sedang memindai...'), findsNothing);
+        expect(find.text('Lauk matang'), findsNothing);
+        expect(find.text('Makanan terdeteksi, siap difoto'), findsNothing);
+      }
+    });
+
+    testWidgets('the shutter opens the form at once; the AI check runs behind it', (tester) async {
+      final validator = SlowValidator();
+      await pumpShare(tester, settle: false, overrides: [cameraFactoryProvider.overrideWithValue(FakeCamera.new), foodValidatorProvider.overrideWithValue(validator)]);
+      await tester.tap(find.bySemanticsLabel('Ambil foto'));
+      await tester.pump(); // the photo is taken and the route is pushed
+      await tester.pump(const Duration(milliseconds: 600)); // the page transition
+      expect(find.byType(ShareFormScreen), findsOneWidget);
+      expect(find.text('AI sedang mengenali makanan...'), findsOneWidget);
+
+      validator.answer.complete(approved);
+      await tester.pumpAndSettle();
+      expect(find.text('AI sedang mengenali makanan...'), findsNothing);
+      expect(find.text('Foto lolos validasi'), findsOneWidget);
+    });
+
+    testWidgets('a blurry photo is explained on the form, blocks publishing and goes back to the camera', (tester) async {
       final validator = ScriptedValidator([const ValidationResult(verdict: AiVerdict.retake, message: msgBlurry, imageQuality: ImageQuality.blurry)]);
-      await pumpShare(tester, overrides: [cameraFactoryProvider.overrideWithValue(FakeCamera.new), foodValidatorProvider.overrideWithValue(validator)]);
+      final c = await pumpShare(tester, overrides: [cameraFactoryProvider.overrideWithValue(FakeCamera.new), foodValidatorProvider.overrideWithValue(validator)]);
       await shoot(tester);
+      expect(find.byType(ShareFormScreen), findsOneWidget);
       expect(find.text('Foto kurang jelas'), findsOneWidget);
       expect(find.text(msgBlurry), findsOneWidget);
-      expect(find.byType(ShareFormScreen), findsNothing);
+
+      final before = c.read(listingsProvider).length;
+      expect(publishDisabled(tester), isTrue, reason: 'the reason is on screen, so the button is simply off');
+      await tester.tap(find.text('Bagikan sekarang'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(c.read(listingsProvider).length, before);
+
       await tester.tap(find.text('Foto ulang'));
       await tester.pumpAndSettle();
+      expect(find.byType(ShareFormScreen), findsNothing);
       expect(find.text('Tips foto'), findsOneWidget, reason: 'back to the shutter controls');
     });
 
@@ -95,9 +157,9 @@ void main() {
       ]);
       await pumpShare(tester, overrides: [cameraFactoryProvider.overrideWithValue(FakeCamera.new), foodValidatorProvider.overrideWithValue(validator)]);
       await shoot(tester);
-      expect(find.text('Ada tanda tidak layak'), findsOneWidget);
-      expect(find.text('Terlihat: jamur hijau di tepi roti.'), findsOneWidget);
-      expect(find.byType(ShareFormScreen), findsNothing);
+      expect(find.text('Foto tidak bisa dipakai'), findsOneWidget);
+      expect(find.textContaining('Terlihat: jamur hijau di tepi roti.'), findsOneWidget);
+      expect(find.text('Foto belum lolos'), findsOneWidget);
     });
 
     testWidgets('a failed check is never treated as passed; "Coba lagi" re-checks the same photo', (tester) async {
@@ -105,14 +167,14 @@ void main() {
       final validator = ScriptedValidator([const ValidationUnavailable(ValidationFailure.timeout), approved]);
       final c = await pumpShare(tester, overrides: [cameraFactoryProvider.overrideWithValue(() => camera), foodValidatorProvider.overrideWithValue(validator)]);
       await shoot(tester);
-      expect(find.text('Pemeriksaan AI gagal'), findsOneWidget);
+      expect(find.text('Pemeriksaan AI gagal'), findsNWidgets(2), reason: 'the status line and the explanation');
       expect(find.textContaining('Foto belum dianggap lolos.'), findsOneWidget);
-      expect(c.read(shareCaptureProvider), isNull);
-      expect(find.byType(ShareFormScreen), findsNothing);
+      expect(c.read(shareCaptureProvider)?.eligible, isFalse);
 
       await tester.tap(find.text('Coba lagi'));
       await tester.pumpAndSettle();
-      expect(find.byType(ShareFormScreen), findsOneWidget);
+      expect(find.text('Foto lolos validasi'), findsOneWidget);
+      expect(find.text('Coba lagi'), findsNothing);
       expect(camera.captures, 1);
       expect(validator.paths, ['photo_1.jpg', 'photo_1.jpg']);
     });
@@ -125,26 +187,13 @@ void main() {
       c.read(demoAiModeProvider.notifier).state = DemoAiMode.serverDown;
       await tester.pumpAndSettle();
       await shoot(tester);
-      expect(find.text('Pemeriksaan AI gagal'), findsOneWidget);
-    });
-
-    testWidgets('cloud mode shows no simulated live detection before the shot', (tester) async {
-      await pumpShare(tester, overrides: [
-        cameraFactoryProvider.overrideWithValue(FakeCamera.new),
-        cloudValidatorProvider.overrideWithValue(true),
-        foodValidatorProvider.overrideWithValue(ScriptedValidator([approved])),
-      ]);
-      expect(find.text('Lauk matang'), findsNothing);
-      expect(find.text('Makanan terdeteksi, siap difoto'), findsNothing);
-      expect(find.text('Arahkan kamera ke makanan'), findsOneWidget);
-      await shoot(tester);
-      expect(find.byType(ShareFormScreen), findsOneWidget);
+      expect(find.text('Pemeriksaan AI gagal'), findsNWidgets(2));
     });
   });
 
   group('review form (step 2)', () {
     Future<ProviderContainer> pumpForm(WidgetTester tester, ShareCapture? capture) =>
-        pumpShare(tester, initial: '/share/form', overrides: [shareCaptureProvider.overrideWith((ref) => capture)]);
+        pumpShare(tester, initial: '/share/form', overrides: [shareCaptureProvider.overrideWith(() => FixedCapture(capture))]);
 
     testWidgets('without a passed photo, publishing is blocked', (tester) async {
       final c = await pumpForm(tester, null);
@@ -227,17 +276,77 @@ void main() {
     testWidgets('fresh ingredients show recipe ideas from the name; the chosen recipe is published', (tester) async {
       const result = ValidationResult(verdict: AiVerdict.approved, category: FoodCategory.bahanMentah, suggestedName: 'Wortel dan kol', suggestedHealthTags: {HealthTag.sayurBuah});
       final c = await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: result));
+      await tester.scrollUntilVisible(find.text('Ide resep'), 100, scrollable: find.byType(Scrollable).first);
       expect(find.text('Ide resep'), findsOneWidget);
       expect(find.text('Minta ide dari AI'), findsNothing, reason: 'no cloud server configured');
       await tester.scrollUntilVisible(find.text('Tumis Kol Wortel'), 100, scrollable: find.byType(Scrollable).first);
       expect(find.text('Sup Wortel Kol'), findsOneWidget);
+      await tester.ensureVisible(find.text('Tumis Kol Wortel')); // clear of the sticky "Bagikan sekarang" bar
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Tumis Kol Wortel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Bagikan sekarang'));
       await tester.pumpAndSettle();
       final listing = c.read(listingsProvider).first;
+      expect(listing.isOwn, isTrue, reason: 'published');
       expect(listing.category, FoodCategory.bahanMentah);
       expect(listing.recipe?.id, 'r_tumis_kol_wortel');
+    });
+
+    testWidgets('the AI answer arriving later fills the empty fields but keeps what the provider typed', (tester) async {
+      final validator = SlowValidator();
+      final c = await pumpShare(tester, initial: '/share/form', settle: false, overrides: [foodValidatorProvider.overrideWithValue(validator)]);
+      unawaited(c.read(shareCaptureProvider.notifier).start('p.jpg'));
+      await tester.pump();
+      expect(find.text('AI sedang mengenali makanan...'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).first, 'Soto buatan ibu');
+
+      validator.answer.complete(const ValidationResult(
+        verdict: AiVerdict.approved,
+        category: FoodCategory.makananMatang,
+        suggestedName: 'Ayam goreng',
+        suggestedDescription: 'Ayam goreng bumbu kuning, 4 potong.',
+        suggestedHealthTags: {HealthTag.protein},
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Soto buatan ibu'), findsOneWidget, reason: 'a name typed by hand is not overwritten');
+      expect(find.text('Ayam goreng'), findsNothing);
+      expect(find.text('Ayam goreng bumbu kuning, 4 potong.'), findsOneWidget);
+      expect(find.text('Lauk matang'), findsOneWidget, reason: 'the category pill');
+
+      await tester.tap(find.text('Bagikan sekarang'));
+      await tester.pumpAndSettle();
+      final listing = c.read(listingsProvider).first;
+      expect(listing.name, 'Soto buatan ibu');
+      expect(listing.description, 'Ayam goreng bumbu kuning, 4 potong.');
+      expect(listing.healthTags, {HealthTag.protein});
+    });
+
+    testWidgets('publishing while the AI is still checking asks to wait', (tester) async {
+      final c = await pumpShare(tester, initial: '/share/form', settle: false, overrides: [shareCaptureProvider.overrideWith(() => FixedCapture(const ShareCapture(photoPath: 'p.jpg')))]);
+      await tester.enterText(find.byType(TextField).first, 'Ayam goreng');
+      final before = c.read(listingsProvider).length;
+      expect(find.text('AI sedang mengenali makanan...'), findsOneWidget);
+      expect(publishDisabled(tester), isTrue);
+      await tester.tap(find.text('Bagikan sekarang'), warnIfMissed: false);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(c.read(listingsProvider).length, before);
+    });
+
+    testWidgets('the AI status line is a live region, so a screen reader hears the answer', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: approved));
+      expect(tester.getSemantics(find.text('Foto lolos validasi')).flagsCollection.isLiveRegion, isTrue);
+      handle.dispose();
+    });
+
+    testWidgets('a description longer than the limit is cut while typing and refused by publish', (tester) async {
+      final c = await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: approved));
+      await tester.enterText(find.widgetWithText(TextField, 'Contoh: Ayam goreng bumbu kuning, 4 potong').first, 'a' * 300);
+      expect(tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text.length, descriptionMaxLength);
+      expect(Validators.description('a' * (descriptionMaxLength + 1)), isNotNull);
+      expect(Validators.description('a' * descriptionMaxLength), isNull);
+      expect(c.read(listingsProvider).first.isOwn, isFalse);
     });
 
     testWidgets('a name without a known ingredient shows that no recipe matches', (tester) async {

@@ -58,6 +58,14 @@ void main() {
       expect(future.verdict, AiVerdict.pendingReview, reason: 'never auto-approve a category the app cannot fill in');
     });
 
+    test('description is optional and trimmed; a wrong type is an error', () {
+      expect(parseCloudValidation(answer()).suggestedDescription, isNull, reason: 'a server from before this field');
+      expect(parseCloudValidation(answer({'description': null})).suggestedDescription, isNull);
+      expect(parseCloudValidation(answer({'description': '   '})).suggestedDescription, isNull);
+      expect(parseCloudValidation(answer({'description': '  Ayam goreng bumbu kuning, 4 potong. '})).suggestedDescription, 'Ayam goreng bumbu kuning, 4 potong.');
+      expect(() => parseCloudValidation(answer({'description': 12})), throwsFormatException);
+    });
+
     test('health_signals become suggested tags; a server without the field suggests none', () {
       expect(parseCloudValidation(answer()).suggestedHealthTags, isEmpty);
       final r = parseCloudValidation(answer({'health_signals': ['sayur_buah', 'protein', 'direbus_kukus', 'whatever']}));

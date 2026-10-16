@@ -38,7 +38,7 @@ final demoAiModeProvider = StateProvider<DemoAiMode>((ref) => DemoAiMode.normal)
 const validatorUrl = String.fromEnvironment('PAWON_VALIDATOR_URL');
 const validatorClientToken = String.fromEnvironment('PAWON_CLIENT_TOKEN');
 
-/// Whether photos go to the cloud validator. The camera then shows no simulated live detection.
+/// Whether photos go to the cloud validator (Qwen behind app/server) instead of the simulation.
 final cloudValidatorProvider = Provider<bool>((ref) => validatorUrl.isNotEmpty);
 
 final foodValidatorProvider = Provider<FoodValidator>(

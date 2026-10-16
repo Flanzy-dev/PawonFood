@@ -75,23 +75,28 @@ which implementation runs:
   `ValidationUnavailable`, which is never treated as passed.
 - The real YOLO/TFLite model (`/ml`) can still replace the simulation later without UI changes.
 
-What the share flow does with each result:
+The camera is a plain camera: no scan line, detection box or "memindai" label, in either mode. The shutter takes the
+photo and opens the form straight away. The AI check runs in the background (`ShareCaptureNotifier` in
+`features/share/share_state.dart`) and fills in the food name, category, description (`Deskripsi`) and "Pilihan sehat"
+tags when it arrives. A field the provider already edited by hand is never overwritten.
 
-| Result | Camera (step 1) | Form (step 2) |
-| --- | --- | --- |
-| approved | opens the form | "Foto lolos validasi"; category filled in |
-| pending_review | opens the form | "Menunggu tinjauan manual"; an unknown category shows "Pilih kategori" and must be picked before publishing; the AI notes show in "Catatan AI" |
-| retake | red box "Foto kurang jelas" + *Foto ulang* | not reachable |
-| rejected | red box "Bukan makanan" or "Ada tanda tidak layak" (with what was seen) + *Foto ulang* | not reachable |
-| check failed | "Pemeriksaan AI gagal" + *Coba lagi* (re-checks the same photo) / *Foto ulang* | not reachable |
+What the form shows for each result:
 
-The form also refuses to publish without a passed photo, and the repository refuses `AiStatus.rejected`. Category
+| Result | Form (step 2) |
+| --- | --- |
+| checking | "AI sedang mengenali makanan..." with a spinner (a static icon under reduced motion); "Bagikan sekarang" is switched off |
+| approved | "Foto lolos validasi"; name, category, description and tags filled in |
+| pending_review | "Menunggu tinjauan manual"; an unknown category shows "Pilih kategori" and must be picked before publishing; the AI notes show in "Catatan AI" |
+| retake | "Foto belum lolos" + "Foto kurang jelas" box + *Foto ulang* (back to the camera); "Bagikan sekarang" is switched off |
+| rejected | "Foto belum lolos" + "Foto tidak bisa dipakai" box (with what was seen) + *Foto ulang*; "Bagikan sekarang" is switched off |
+| check failed | "Pemeriksaan AI gagal" + *Coba lagi* (re-checks the same photo) / *Foto ulang*; "Bagikan sekarang" is switched off |
+
+The form refuses to publish without a passed photo, and the repository refuses `AiStatus.rejected`. Category
 correction ("Ubah") stays open. The listing keeps the AI's category in `aiCategory`, so `categoryCorrected` shows
-when the provider changed it. In cloud mode the camera shows no live box before the shot, because Qwen only runs
-on the captured photo.
+when the provider changed it. The description is saved to `Listing.description`.
 
-The copy for the new states (retake, spoilage, check failed, "Pilih kategori", "Catatan AI") is not in the Figma
-file yet. It was written to match the existing tone.
+The copy for the new states (checking, retake, spoilage, check failed, "Pilih kategori", "Catatan AI", "Deskripsi")
+is not in the Figma file yet. It was written to match the existing tone.
 
 **Demo switches:**
 

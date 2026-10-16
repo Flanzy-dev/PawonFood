@@ -9,6 +9,7 @@ export const HEALTH_SIGNALS = ['sayur_buah', 'protein', 'digoreng', 'direbus_kuk
 export const MAX_NOTES = 8;
 export const MAX_NOTE_LENGTH = 80;
 export const MAX_NAME_LENGTH = 60;
+export const MAX_DESCRIPTION_LENGTH = 160;
 
 // Other spellings of the app's category keys that a model may plausibly use.
 const CATEGORY_ALIASES = { sealed_food: 'makanan_kemasan' };
@@ -90,10 +91,19 @@ export function parseObservation(raw) {
     foodName = clean(raw.food_name).slice(0, MAX_NAME_LENGTH) || null;
   }
 
+  // Optional (older prompts send none). A description that certifies safety or quotes a score is dropped like a note.
+  let description = null;
+  if (raw.description !== undefined && raw.description !== null) {
+    if (typeof raw.description !== 'string') throw new ModelResponseError('description is not text');
+    const text = clean(raw.description).slice(0, MAX_DESCRIPTION_LENGTH);
+    description = text && !FORBIDDEN_NOTE.test(text) ? text : null;
+  }
+
   return {
     is_food: raw.is_food,
     category: normalizeCategory(raw.category),
     food_name: raw.is_food ? foodName : null,
+    description: raw.is_food ? description : null,
     visual_condition: oneOf(raw.visual_condition, VISUAL_CONDITIONS, 'visual_condition'),
     visible_signs: notes(raw.visible_signs, 'visible_signs'),
     image_quality: oneOf(raw.image_quality, IMAGE_QUALITIES, 'image_quality'),

@@ -114,6 +114,10 @@ ValidationResult parseCloudValidation(Object? json) {
   final name = json['food_name'];
   if (name != null && name is! String) throw const FormatException('food_name has the wrong type');
   final foodName = name is String ? name.trim() : '';
+  // Optional: servers from before this field send none.
+  final desc = json['description'];
+  if (desc != null && desc is! String) throw const FormatException('description has the wrong type');
+  final description = desc is String ? desc.trim() : '';
   final reason = field<String>('reason').trim();
 
   // Optional: servers from before this field send none, which simply suggests no tags.
@@ -127,6 +131,7 @@ ValidationResult parseCloudValidation(Object? json) {
     category: category,
     message: reason.isEmpty ? null : reason,
     suggestedName: foodName.isEmpty ? null : foodName,
+    suggestedDescription: description.isEmpty ? null : description,
     visualCondition: visual,
     imageQuality: quality,
     visibleSigns: notes('visible_signs'),

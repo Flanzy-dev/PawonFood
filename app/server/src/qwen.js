@@ -100,6 +100,7 @@ export const FAKE_ANSWER = JSON.stringify({
   is_food: true,
   category: 'makanan_matang',
   food_name: 'Ayam goreng',
+  description: 'Ayam goreng bumbu kuning, beberapa potong paha dan dada.',
   visual_condition: 'no_visible_issues',
   visible_signs: [],
   image_quality: 'good',

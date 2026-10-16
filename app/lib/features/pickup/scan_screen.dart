@@ -172,7 +172,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                 builder: (_, left) => Pill('Sisa ${formatMinutesLeft(left)}', fill: AppColors.primaryDark, color: AppColors.detectBox, height: 30, size: 13, weight: 700),
                               ),
                             ),
-                            const Positioned(left: 16, bottom: 16, child: Pill('Pratinjau kamera', fill: Color(0xC7111A15), color: AppColors.surfaceSand, height: 32, size: 14, weight: 500, hPad: 14)),
+                            const Positioned(left: 16, bottom: 16, child: Pill('Pratinjau kamera', fill: AppColors.scrimLabel, color: AppColors.surfaceSand, height: 32, size: 14, weight: 500, hPad: 14)),
                           ],
                         ),
                       ),

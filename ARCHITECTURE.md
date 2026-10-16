@@ -203,7 +203,7 @@ Target: 3 taps or fewer.
 3. Request goes to the repository layer. In the MVP this is mock data; later it is Supabase.
 4. Backend verifies authentication and authorization (Supabase RLS policies) before reads and writes
 5. Response returns to the UI
-6. UI handles success, loading (including the "AI sedang memindai..." scan state), empty and error states
+6. UI handles success, loading (the photo check runs in the background; the form shows "AI sedang mengenali makanan..." until it answers), empty and error states
 
 ## Security notes
 

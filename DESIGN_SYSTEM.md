@@ -144,10 +144,10 @@ States for every interactive component: default, pressed, focused, disabled, loa
 Step 1 of the share flow.
 
 - Dark full-screen layout (`--camera-bg`) with a rounded preview.
-- Light-green bounding box labeled with the detected category (e.g. "Lauk matang").
-- Status row: check icon and "Makanan terdeteksi, siap difoto".
+- Plain camera: no bounding box, scan line or "memindai" label. Hint: "Arahkan kamera ke makanan".
 - Large cream shutter button, with "Tips foto" and "Balik" on either side.
-- While inference runs, show "AI sedang memindai..." with a green scan line moving up and down over the photo.
+- The AI check runs in the background after the shutter. The review form (step 2) shows "AI sedang mengenali makanan..." with a small spinner, then fills in name, category, description and health tags. A photo the AI rejects is explained on the form with a "Foto ulang" button.
+- The Figma hi-fi camera screens (C12–C14) still show the older box and status row.
 
 ## Motion
 
@@ -178,7 +178,7 @@ confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/moti
   deliberate large-surface motion; it never uses `pop`, absorbs taps while up, and never plays before a failure
   (an expired scan gets no green). Inline checks (the route arrival) just pop the circle and draw the check.
   Failure and clock marks pop in.
-- **Live states:** AI scan line and QR scan line sweep; "Menunggu ... memindai" fades in and out (opacity, never size); the scanner corners stay still;
+- **Live states:** the QR scan line sweeps (the camera has no AI scan line any more); "Menunggu ... memindai" fades in and out (opacity, never size); the scanner corners stay still;
   typing dots while an offer waits; the route marker walks along the path.
 - **Welcome hero:** three food photos slide every 4 s (`slow`, `move`) with page dots under the photo; a manual swipe
   resets the timer, and the slide never starts under a finger or while another screen covers Welcome. It is the one sanctioned loop and does not auto-advance under reduced motion.

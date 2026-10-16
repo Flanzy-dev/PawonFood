@@ -59,6 +59,7 @@ class ValidationResult {
     this.confidence = 0,
     this.detections = const [],
     this.suggestedName,
+    this.suggestedDescription,
     this.visualCondition,
     this.imageQuality,
     this.visibleSigns = const [],
@@ -80,6 +81,9 @@ class ValidationResult {
 
   /// Name pre-filled in the share form: the simulation's name, or `food_name` from the cloud validator.
   final String? suggestedName;
+
+  /// One short sentence about what the photo shows, pre-filled in the form's "Deskripsi".
+  final String? suggestedDescription;
   final VisualCondition? visualCondition;
   final ImageQuality? imageQuality;
 
@@ -214,6 +218,7 @@ class SimulatedFoodValidator implements FoodValidator {
       confidence: r.confidence,
       detections: r.detections,
       suggestedName: r.verdict == AiVerdict.rejected ? null : (m == DemoAiMode.rawIngredients ? 'Wortel dan kol' : 'Ayam goreng'),
+      suggestedDescription: r.verdict == AiVerdict.rejected ? null : (m == DemoAiMode.rawIngredients ? 'Wortel dan kol utuh, belum dipotong.' : 'Ayam goreng bumbu kuning, beberapa potong paha dan dada.'),
       suggestedHealthTags: switch (m) {
         _ when r.verdict == AiVerdict.rejected => const {},
         DemoAiMode.rawIngredients => const {HealthTag.sayurBuah, HealthTag.tidakDigoreng},

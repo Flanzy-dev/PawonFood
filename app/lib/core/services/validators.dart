@@ -8,6 +8,9 @@ import 'pickup_times.dart';
 /// The delivery fees a provider can pick in the share form (PRD Handover methods). All of it goes to the provider.
 const deliveryFeeOptions = [0, 2000, 3000];
 
+/// Longest description of a listing (the AI's own suggestion is cut at 160 on the server).
+const descriptionMaxLength = 200;
+
 /// Input validation (AGENTS.md: price >= 0, portions >= 1, pickup time in the future). Messages are Indonesian.
 abstract final class Validators {
   static final _email = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
@@ -31,6 +34,8 @@ abstract final class Validators {
 
   /// A new password must pass [password] and differ from the old one (A4e, D18i).
   static String? newPassword(String? v, {String? old}) => password(v) ?? (old != null && v == old ? 'Password baru harus berbeda dari yang lama' : null);
+
+  static String? description(String? v) => v != null && v.trim().length > descriptionMaxLength ? 'Deskripsi maksimal $descriptionMaxLength karakter' : null;
 
   static String? price(int? v) => (v == null || v < 0) ? 'Harga tidak boleh negatif' : null;
 

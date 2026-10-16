@@ -111,6 +111,7 @@ class ListingsNotifier extends Notifier<List<Listing>> {
     final now = ref.read(clockProvider)();
     final error = (d.aiStatus == AiStatus.rejected ? 'Foto belum lolos pengecekan AI.' : null) ??
         (d.name.trim().isEmpty ? 'Nama makanan wajib diisi' : null) ??
+        Validators.description(d.description) ??
         Validators.portions(d.portions) ??
         Validators.price(d.price) ??
         Validators.pickupTime(d.pickupBy, now) ??

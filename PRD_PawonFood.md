@@ -260,7 +260,7 @@ foto dari kamera → deteksi YOLO → atur harga & cara serah terima → tayang 
 Yang termasuk MVP:
 - Data lokasi dan daftar makanan awal masih *hardcoded*.
 - Riwayat klik dan lama melihat disimpan di state aplikasi, cukup untuk menunjukkan urutan feed berubah saat demo.
-- Deteksi YOLO berjalan di perangkat, dengan animasi "AI sedang memindai...".
+- Kamera tampil polos tanpa efek pemindaian. Pengecekan AI berjalan di background setelah foto diambil dan mengisi nama, kategori, dan deskripsi di form. Model YOLO di perangkat menyusul.
 - Video cadangan seluruh alur, dari login sampai pindai QR, kalau demo langsung gagal.
 
 Tidak termasuk MVP: reset kata sandi, edit profil, pembayaran QRIS sungguhan, penukaran poin sungguhan, *promoted listing*, dan iklan aktif.

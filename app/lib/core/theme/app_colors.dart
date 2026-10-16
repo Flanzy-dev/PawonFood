@@ -39,6 +39,13 @@ abstract final class AppColors {
   static const errorLight = Color(0xFFF2B8B5);
   static const cameraText = Color(0xFFD9D3C2);
 
+  /// Dark scrims over photos and the camera preview: [cameraBg] at different opacities.
+  static const scrimClear = Color(0x00111A15);
+  static const scrimDim = Color(0x2E111A15);
+  static const scrimTop = Color(0x73111A15);
+  static const scrimLabel = Color(0xC7111A15);
+  static const scrimBottom = Color(0xE6111A15);
+
   /// Soft shadow used on the bottom nav, sheets and the FAB only.
   static const shadow = Color(0x1A142319);
 }
