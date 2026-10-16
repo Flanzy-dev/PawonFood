@@ -18,7 +18,7 @@ export const CUES = {
   arrive: beat(12), // the route reaches the student
   phoneIn: beat(14), // cut: the phone rises in
   headline: beat(15), // "Kenalkan, PawonFood."
-  detect: beat(16), // the camera's AI detection box closes on the meal
+  detect: beat(16), // the camera framing settles on the meal
   shutter: beat(17), // camera shutter
   toMap: beat(18), // the screen pushes to the Peta map
   tagline: beat(19), // "Temukan makanan di sekitarmu."

@@ -1,5 +1,5 @@
 // Ad scene 3 (7–11 s): "Kenalkan, PawonFood." The split frame swells away as a phone is thrown up and lands. The
-// provider photographs the meal (AI detection, shutter), the map shows it nearby, and its listing card lifts out of the
+// provider photographs the meal (framing settles, shutter), the map shows it nearby, and its listing card lifts out of the
 // phone.
 
 import { color, alpha, display, ui, springs } from '../tokens.js';
@@ -13,7 +13,7 @@ import { mapCardRect, mapScreen } from './nearby.js';
 
 const LENGTH = SCENES.rescue - SCENES.connect;
 const HEADLINE = CUES.headline - SCENES.connect;
-// The camera screen's clock, set so its AI detection lands on the detect beat.
+// The camera screen's clock, set so its framing settles on the detect beat.
 const CAMERA = CUES.detect - SCENES.connect - DETECT_AT;
 const SHUTTER = CUES.shutter - SCENES.connect;
 const TO_MAP = CUES.toMap - SCENES.connect;

@@ -28,7 +28,7 @@ This is the opening 20 seconds of the team's two-minute hackathon pitch video. T
 | --- | --- | --- | --- |
 | 00:00–00:04 | Problem | Kos kitchen. A container of freshly cooked rice and sayur lodeh sits on the counter. A slow dolly push-in, steam rising; from 1.5 s the light sinks toward dusk and the steam thins: nobody has come for it. | **Masak kebanyakan?** (0.5 s, leaves on 3.5 s) |
 | 00:04–00:07 | Opportunity | Match cut: the kitchen settles into a top panel, still drifting, and the customer (a student, standing in the same kitchen) lands below. At 5.0 s a walking route runs from the food down the margin to her phone, arriving at 6.0 s with a pulse. | **Jangan biarkan jadi sia-sia.** (4.5 s) · "300 m · ± 4 mnt jalan kaki" (5.5 s) |
-| 00:07–00:11 | PawonFood connects | The phone is thrown up and lands with a little give. AI detection closes on the meal (8.0), shutter (8.5), push to the Peta map (9.0); the listing card floats out of the phone and bobs (10.0). | **Kenalkan, PawonFood.** (7.5) · "Temukan makanan di sekitarmu." (9.5) |
+| 00:07–00:11 | PawonFood connects | The phone is thrown up and lands with a little give. the camera framing settles on the meal (8.0), shutter (8.5), push to the Peta map (9.0); the listing card floats out of the phone and bobs (10.0). | **Kenalkan, PawonFood.** (7.5) · "Temukan makanan di sekitarmu." (9.5) |
 | 00:11–00:16 | Rescue in action | Card pressed with a tap ripple (11.5) → push to the chat (12.0): "Saya ambil ya." and "Ambil gratis disetujui" (12.5) → a window opens from the listing photo (13.0) onto the same customer receiving the container (13.5) → illustrative QR check (14.0–14.5) → success mark (15.0). | **Temukan. Pesan. Ambil.** (each word lights on its action: 11.5, 12.5, 13.5) |
 | 00:16–00:20 | Brand reveal | Cream floods out from the success mark (16.0). Logo (16.5) with a little steam rising from the Tungku, wordmark, then one line per beat and the terracotta underline (18.5). A slow push-in carries it under the speaker. | **Dari dapur ke komunitas.** (17.0) / **Masak kebanyakan?** (17.5) / **Bagikan, jangan buang.** (18.0) |
 
@@ -70,7 +70,7 @@ Recording tips:
 | 00:04.0 | Split frame | Whoosh shaped by the panel's spring. The pad opens to Gmaj7 and quarter-note marimba begins. |
 | 00:05.5 / 00:06.0 | Distance tag / route reaches her | Small bells |
 | 00:07.0 | Phone lands | Whoosh shaped by the landing spring. Pad on D/F#, eighth-note marimba. |
-| 00:08.0 / 00:08.5 | AI detection / shutter | High tick, then camera click; shakers start on the off-beats |
+| 00:08.0 / 00:08.5 | framing settles / shutter | High tick, then camera click; shakers start on the off-beats |
 | 00:09.0 | Push to the map | Light swish. Pad on A. |
 | 00:10.0 | Card floats out | Chime (E6, B6) and a soft whoosh that pulses with the card's bob |
 | 00:11.0–16.0 | Rescue | Membrane kick on every beat, shaker on the off-beats, marimba eighths with octave sparkles |
@@ -111,7 +111,7 @@ The kitchen spice jars carry legible labels (Sambal, Ketumbar, garam, pepper). T
 - Every phone screen follows the real app's screens and copy: camera "Langkah 1 dari 3", Peta, the listing card, and the chat with "Ambil gratis disetujui".
 - The QR is illustrative and encodes nothing.
 - There are no statistics, testimonials, partners or impact numbers. Tier names are left out on purpose.
-- The AI step is shown as detection ("Makanan terdeteksi, siap difoto"), not as a food-safety guarantee.
+- The camera is a plain viewfinder. The AI check is only mentioned as "Foto asli, dicek AI" (it runs in the background after the shot) and is never presented as a food-safety guarantee.
 - **Slogan:** "Dari dapur ke komunitas" is the official slogan (PRD, README, app and this ad agree since 2026-10-15; it was "Dari dapur ke dapur" before). Keep it consistent with the rest of the pitch.
 
 ## Export checklist
