@@ -1,6 +1,7 @@
 // Renders the app screens used in the pitch deck to PNG files. Skipped unless DECK_SHOTS names an output folder:
 //   $env:DECK_SHOTS="..\render\out\deck-screens"; flutter test test\deck_screenshots_test.dart
 // The camera previews are stand-ins (a food photo, a QR code), because flutter_test has no real camera.
+// Every PNG is 1280 x 2772 (the demo phone: 400 x 866 logical at 3.2x).
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -34,7 +35,7 @@ class _PictureCamera implements AppCamera {
   @override
   Widget buildPreview() => SizedBox.expand(child: preview);
   @override
-  Future<String> capture() async => 'deck_photo.jpg';
+  Future<String> capture() async => File('assets/images/food/ayam2.jpg').absolute.path;
   @override
   Future<CameraStatus> flip() async => CameraStatus.ready;
   @override
@@ -61,6 +62,7 @@ List<Override> _overrides({Widget? cameraPreview, Duration scanDelay = Duration.
       mockDataProvider.overrideWithValue(loadMockData()),
       clockProvider.overrideWithValue(() => fixedNow),
       simulatedReplyDelayProvider.overrideWithValue(Duration.zero),
+      simulatedOfferDelayProvider.overrideWithValue(Duration.zero),
       simulatedScanDelayProvider.overrideWithValue(scanDelay),
       randomProvider.overrideWithValue(Random(7)),
       tilesEnabledProvider.overrideWithValue(false),
@@ -80,8 +82,17 @@ Future<void> _loadAllFonts() async {
   }
 }
 
+const _deckPixelRatio = 3.2;
+
+void _deckPhone(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1280, 2772);
+  tester.view.devicePixelRatio = _deckPixelRatio;
+  addTearDown(tester.view.reset);
+  useReducedMotion(tester);
+}
+
 Future<void> _start(WidgetTester tester, List<Override> overrides) async {
-  usePhoneScreen(tester);
+  _deckPhone(tester);
   await tester.pumpWidget(RepaintBoundary(key: _frame, child: ProviderScope(overrides: overrides, child: const PawonApp())));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Sudah punya akun? Masuk'));
@@ -122,7 +133,7 @@ Future<void> _shot(WidgetTester tester, String name) async {
   await _settleImages(tester);
   final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(_frame));
   await tester.runAsync(() async {
-    final image = await boundary.toImage(pixelRatio: 2);
+    final image = await boundary.toImage(pixelRatio: _deckPixelRatio);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final file = File('$_out/$name.png')..createSync(recursive: true);
     file.writeAsBytesSync(bytes!.buffer.asUint8List());

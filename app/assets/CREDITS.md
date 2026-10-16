@@ -20,3 +20,22 @@ The PawonFood wordmark, the Berbagi illustration, the three Welcome illustration
 (exported from the PawonFood-Design Figma file). Map tiles are (c) OpenStreetMap contributors (the credit is shown on every map). Walking routes are computed from
 OpenStreetMap data by the FOSSGIS OSRM foot router (routing.openstreetmap.de), free for light use.
 Fonts: Bricolage Grotesque and Inter, SIL Open Font License 1.1 (see `assets/fonts/OFL-*.txt`).
+
+## AI-generated art
+
+Illustrations only. Never use them as listing photos (listings show real camera photos).
+
+| Asset | Made with | Date | Prompt |
+| --- | --- | --- | --- |
+| `reference/proposal-src/art/sasaran.jpg` | GPT image via Codex CLI (codex) | 2026-10-16 | Wide scene at a kos doorway in Yogyakarta. On the left, a friendly middle-aged Indonesian woman in a batik-patterned apron over a dark green blouse, hair in ... |
+| `reference/proposal-src/art/cover.jpg` | GPT image via Codex CLI (codex) | 2026-10-16 | A warm, lived-in Indonesian kos kitchen seen straight on. A wooden counter in the foreground holds one neatly packed, lidded clear container of white rice an... |
+| `reference/proposal-src/art/pogung.jpg` | GPT image via Codex CLI (codex) | 2026-10-16 | A quiet lane of student boarding houses (kos) in a Yogyakarta neighbourhood near a university campus, in warm afternoon light. Low houses with terracotta til... |
+| `reference/proposal-src/art/strategi.jpg` | GPT image via Codex CLI (codex) | 2026-10-16 | At the front of a small neighbourhood warung near a university campus, a friendly warung owner (middle-aged Indonesian woman in a simple apron and head scarf... |
+| `reference/proposal-src/art/penutup.jpg` | GPT image via Codex CLI (codex) | 2026-10-16 | Early evening on the terrace of a kos house. Neighbours of different ages (a middle-aged woman in a batik apron, two young students with backpacks, an older ... |
+| `reference/proposal-src/art/deck-cover.png` | GPT image via Codex CLI (codex) | 2026-10-16 | A warm, lived-in Indonesian kos kitchen in soft morning light, seen straight on in a tall portrait composition. A wooden counter in the lower third holds one... |
+| `render/web/media/data-1.png` | GPT image via Codex CLI (codex) | 2026-10-16 | A warm, lived-in Indonesian home kitchen in soft late-afternoon light, seen straight on in a tall portrait composition. On a wooden counter and a small stove... |
+| `render/web/media/data-2.png` | GPT image via Codex CLI (codex) | 2026-10-16 | A tall portrait illustration of a neighbourhood communal waste spot beside a narrow Yogyakarta lane in soft overcast afternoon light. A large open bin and se... |
+| `render/web/media/data-3.png` | GPT image via Codex CLI (codex) | 2026-10-16 | A tall portrait illustration of a row of small Indonesian family houses along a Yogyakarta kampung lane at golden hour, seen from across the lane. Every hous... |
+| `render/web/media/data-4.png` | GPT image via Codex CLI (codex) | 2026-10-16 | A tall portrait illustration inside a small, tidy Indonesian student boarding-house room (kos) in the late afternoon. The student stands at an open small ref... |
+| `render/web/media/data-5.png` | GPT image via Codex CLI (codex) | 2026-10-16 | A tall portrait illustration of a narrow kos lane in a Yogyakarta student neighbourhood at early evening. The same student walks alone down the lane holding ... |
+| `render/web/media/data-6.png` | GPT image via Codex CLI (codex) | 2026-10-16 | A tall portrait illustration at dusk at the corner of a Yogyakarta kampung lane where two worlds almost meet. On the right, a neighbour's kitchen window glow... |

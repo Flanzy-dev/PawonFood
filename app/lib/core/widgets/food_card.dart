@@ -56,7 +56,7 @@ class FoodCard extends ConsumerWidget {
     final label = foodLabelFor(l, ref.watch(clockProvider)());
     return Semantics(
       button: true,
-      label: '${l.name}${label == null ? '' : ', ${label.label.toLowerCase()}'}, ${l.provider.name}, ${l.isFree ? 'gratis' : formatRupiah(l.price)}${l.negotiable ? ', bisa ditawar' : ''}${l.canDeliver ? ', bisa diantar' : ''}, sisa ${l.portionsLeft} porsi, ${formatDistance(distance)}',
+      label: '${l.name}${label == null ? '' : ', ${label.label.toLowerCase()}'}, ${l.provider.name}, ${l.isFree ? 'gratis' : formatRupiah(l.price)}${l.negotiable ? ', bisa ditawar' : ''}${l.canDeliver ? ', bisa diantar' : ''}${l.bringsContainer ? ', bawa wadah sendiri' : ''}, sisa ${l.portionsLeft} porsi, ${formatDistance(distance)}',
       child: Pressable(
         scale: 0.98,
         child: Material(
@@ -105,6 +105,7 @@ class FoodCard extends ConsumerWidget {
                                 Row(children: [
                                   TierTag(l.provider.tier),
                                   if (l.canDeliver) ...[const SizedBox(width: 6), const DeliveryTag()],
+                                  if (l.bringsContainer) ...[const SizedBox(width: 6), const ContainerTag()],
                                 ]),
                               ],
                             ),

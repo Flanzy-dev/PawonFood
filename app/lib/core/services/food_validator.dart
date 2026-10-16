@@ -22,21 +22,8 @@ class Detection {
   final double confidence;
 }
 
-/// `retake`: the photo is too poor to judge (blurry, dark, blocked). `rejected`: not food, or visibly spoiled.
+/// `retake`: the photo is too poor to judge (blurry, dark, blocked). `rejected`: not food.
 enum AiVerdict { approved, rejected, pendingReview, retake }
-
-/// What the photo shows about the food's surface (cloud validator only). Visual only: never a safety verdict.
-enum VisualCondition {
-  noVisibleIssues('no_visible_issues'),
-  minorConcerns('minor_concerns'),
-  visibleSpoilage('visible_spoilage'),
-  cannotAssess('cannot_assess');
-
-  const VisualCondition(this.key);
-  final String key;
-
-  static VisualCondition? tryKey(Object? key) => values.where((v) => v.key == key).firstOrNull;
-}
 
 enum ImageQuality {
   good('good'),
@@ -60,9 +47,7 @@ class ValidationResult {
     this.detections = const [],
     this.suggestedName,
     this.suggestedDescription,
-    this.visualCondition,
     this.imageQuality,
-    this.visibleSigns = const [],
     this.warnings = const [],
     this.suggestedHealthTags = const {},
   });
@@ -84,11 +69,9 @@ class ValidationResult {
 
   /// One short sentence about what the photo shows, pre-filled in the form's "Deskripsi".
   final String? suggestedDescription;
-  final VisualCondition? visualCondition;
   final ImageQuality? imageQuality;
 
-  /// Visible signs such as "daun sedikit layu", shown to the provider before publishing.
-  final List<String> visibleSigns;
+  /// Short notes about ambiguity ("lebih dari satu jenis makanan"), shown to the provider before publishing.
   final List<String> warnings;
 
   /// "Pilihan sehat" tags the AI could see (pre-selected in the share form; the provider confirms them).
@@ -134,9 +117,8 @@ class ValidationUnavailable implements Exception {
 
 const msgNoDetection = 'Tidak ada makanan yang terdeteksi di foto.';
 const msgNotFood = 'Gambar terdeteksi bukan makanan. Mohon foto ulang.';
-// The two below match REASONS in server/src/rules.js.
+// Matches REASONS.blurry in server/src/rules.js.
 const msgBlurry = 'Foto buram. Pegang kamera lebih stabil, lalu foto ulang.';
-const msgSpoiled = 'Terlihat tanda makanan tidak layak, misalnya jamur atau busuk. Makanan ini tidak bisa dibagikan.';
 
 /// Decision rule from ARCHITECTURE.md (identical on device and in the optional server validator):
 /// no detections -> rejected; `bukan_makanan` > 0.70 -> rejected; any food class > 0.60 -> approved;
@@ -170,7 +152,6 @@ enum DemoAiMode {
   notFood('Bukan makanan (ditolak)'),
   lowConfidence('Ragu-ragu (tinjauan manual)'),
   blurry('Foto buram (foto ulang)'),
-  spoiled('Tanda basi (ditolak)'),
   serverDown('Server AI gagal (coba lagi)');
 
   const DemoAiMode(this.label);
@@ -190,16 +171,7 @@ class SimulatedFoodValidator implements FoodValidator {
     final m = mode();
     switch (m) {
       case DemoAiMode.blurry:
-        return const ValidationResult(verdict: AiVerdict.retake, message: msgBlurry, imageQuality: ImageQuality.blurry, visualCondition: VisualCondition.cannotAssess);
-      case DemoAiMode.spoiled:
-        return const ValidationResult(
-          verdict: AiVerdict.rejected,
-          category: FoodCategory.makananMatang,
-          message: msgSpoiled,
-          imageQuality: ImageQuality.good,
-          visualCondition: VisualCondition.visibleSpoilage,
-          visibleSigns: ['Bercak jamur putih di permukaan nasi'],
-        );
+        return const ValidationResult(verdict: AiVerdict.retake, message: msgBlurry, imageQuality: ImageQuality.blurry);
       case DemoAiMode.serverDown:
         throw const ValidationUnavailable(ValidationFailure.network);
       case DemoAiMode.normal || DemoAiMode.rawIngredients || DemoAiMode.notFood || DemoAiMode.lowConfidence:

@@ -20,6 +20,7 @@ import '../../core/widgets/food_card.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/navigation_widgets.dart';
 import '../../core/widgets/option_row.dart';
+import '../../core/widgets/packed_filter_chip.dart';
 import '../../core/widgets/pawon_map.dart';
 import '../../core/widgets/pills.dart';
 import 'search_screen.dart';
@@ -36,7 +37,8 @@ class HomeScreen extends ConsumerWidget {
     final filters = ref.watch(feedFiltersProvider);
     final category = ref.watch(categoryFilterProvider);
     final query = ref.watch(searchQueryProvider);
-    final narrowed = query.trim().isNotEmpty || category != null;
+    final packedOnly = filters.contains(FeedFilter.packed);
+    final narrowed = query.trim().isNotEmpty || category != null || packedOnly;
     final radius = ref.watch(radiusMetersProvider);
     final km = (radius / 1000).round();
     final area = loc.name.split(',').first;
@@ -105,6 +107,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
+                const PackedFilterChip(),
               ],
             ),
           ),
@@ -169,9 +172,11 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(top: 8),
               child: EmptyState(
                 icon: LucideIcons.searchX,
-                title: query.trim().isNotEmpty ? 'Tidak ada hasil untuk "${query.trim()}"' : 'Belum ada ${category!.label.toLowerCase()} di sekitarmu',
+                title: query.trim().isNotEmpty
+                    ? 'Tidak ada hasil untuk "${query.trim()}"'
+                    : 'Belum ada ${category?.label.toLowerCase() ?? 'makanan'}${packedOnly ? ' yang sudah dibungkus' : ''} di sekitarmu',
                 // No button: the ✕ in the search field clears the search, the "All" chip clears the category.
-                body: 'Coba kata kunci atau kategori lain.',
+                body: 'Coba kata kunci, kategori atau filter lain.',
               ),
             )
           else if (feed.isEmpty)

@@ -33,8 +33,6 @@ export const observation = (overrides = {}) => ({
   category: 'makanan_matang',
   food_name: 'Ayam goreng',
   description: 'Ayam goreng bumbu kuning, 4 potong.',
-  visual_condition: 'no_visible_issues',
-  visible_signs: [],
   image_quality: 'good',
   warnings: [],
   health_signals: [],

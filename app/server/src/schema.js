@@ -2,7 +2,6 @@
 // malformed answer can never turn into an approval.
 
 export const CATEGORIES = ['makanan_matang', 'bahan_mentah', 'makanan_kemasan', 'bukan_makanan', 'unknown'];
-export const VISUAL_CONDITIONS = ['no_visible_issues', 'minor_concerns', 'visible_spoilage', 'cannot_assess'];
 export const IMAGE_QUALITIES = ['good', 'blurry', 'too_dark', 'obstructed', 'too_far'];
 export const HEALTH_SIGNALS = ['sayur_buah', 'protein', 'digoreng', 'direbus_kukus'];
 
@@ -104,8 +103,6 @@ export function parseObservation(raw) {
     category: normalizeCategory(raw.category),
     food_name: raw.is_food ? foodName : null,
     description: raw.is_food ? description : null,
-    visual_condition: oneOf(raw.visual_condition, VISUAL_CONDITIONS, 'visual_condition'),
-    visible_signs: notes(raw.visible_signs, 'visible_signs'),
     image_quality: oneOf(raw.image_quality, IMAGE_QUALITIES, 'image_quality'),
     warnings: notes(raw.warnings, 'warnings'),
     health_signals: raw.is_food ? healthSignals(raw.health_signals) : [],

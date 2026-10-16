@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../models/enums.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
@@ -58,5 +59,29 @@ class InfoBox extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// "Kemasan" row of the detail and chat cards: wrapped food in the success tint, "Bawa wadah sendiri" in sand with an accent icon.
+class PackagingNote extends StatelessWidget {
+  const PackagingNote(this.packaging, {super.key, this.compact = false});
+
+  final Packaging packaging;
+
+  /// One line for cards that already say the rest (the hint only for [Packaging.wadahSendiri], the case that needs a reminder).
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final wadah = packaging == Packaging.wadahSendiri;
+    final icon = wadah ? LucideIcons.container : LucideIcons.package;
+    if (compact) {
+      return Row(children: [
+        Icon(icon, size: 16, color: wadah ? AppColors.accent : AppColors.primary),
+        const SizedBox(width: 8),
+        Expanded(child: Text(wadah ? '${packaging.label} · ${packaging.hint}' : packaging.label, style: AppTypography.text(13, height: 18, weight: 600, color: AppColors.ink))),
+      ]);
+    }
+    return InfoBox(packaging.hint, title: packaging.label, icon: icon, tone: wadah ? InfoTone.sand : InfoTone.tint, iconColor: wadah ? AppColors.accent : null);
   }
 }

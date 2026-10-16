@@ -39,7 +39,7 @@ Note: `flutter create` fails inside the OneDrive folder on this machine; the pro
 - **Login:** any valid email or phone + any password signs in as the demo persona "Rafi Pratama" (150 poin, Pawon Friend).
   Register creates a new user with 0 points; the seeded chats stay available so the whole journey can be demoed.
 - The other party in chats is simulated (`core/data/chat_repository.dart`):
-  - an offer of at least 50% of the price is accepted after about 1.5 s (B10j "Menunggu jawaban" shows meanwhile);
+  - an offer of at least 50% of the price is accepted after about 8 s (B10j "Menunggu jawaban" shows meanwhile, with "Batalkan tawaran");
     acceptance or "Ambil" reserves the portions until the pickup deadline;
   - a lower offer gets a counter offer (about 60% of the price); non-negotiable listings only take the full price;
   - **Saya berbagi** has an incoming offer from "Dina Ayu" on your own listing (Terima / Tolak, then "Buka QR ambil";
@@ -95,14 +95,13 @@ The form refuses to publish without a passed photo, and the repository refuses `
 correction ("Ubah") stays open. The listing keeps the AI's category in `aiCategory`, so `categoryCorrected` shows
 when the provider changed it. The description is saved to `Listing.description`.
 
-The copy for the new states (checking, retake, spoilage, check failed, "Pilih kategori", "Catatan AI", "Deskripsi")
+The copy for the new states (checking, retake, check failed, "Pilih kategori", "Catatan AI", "Deskripsi")
 is not in the Figma file yet. It was written to match the existing tone.
 
 **Demo switches:**
 
 - long-press "Langkah 1 dari 3" on the camera screen (simulated mode only) to force *Normal*, *Bahan mentah*,
-  *Bukan makanan* (rejected), *Ragu-ragu* (manual review), *Foto buram* (retake), *Tanda basi* (rejected for
-  spoilage) or *Server AI gagal* (check failed, *Coba lagi*);
+  *Bukan makanan* (rejected), *Ragu-ragu* (manual review), *Foto buram* (retake) or *Server AI gagal* (check failed, *Coba lagi*);
 - long-press "Bayar dengan QRIS" to make the payment fail (B10h);
 - long-press the "Iklan" pill to swap the image and video ad;
 - tap the scanner preview (B10b) or the provider's QR (C17) to scan right away;

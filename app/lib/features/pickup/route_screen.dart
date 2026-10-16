@@ -22,6 +22,7 @@ import '../../core/services/route_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/info_box.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/countdown.dart';
 import '../../core/widgets/navigation_widgets.dart';
@@ -378,6 +379,7 @@ class _PlanBody extends StatelessWidget {
         drop == null
             ? _Stop(icon: LucideIcons.mapPin, caption: 'Ke', title: info.provider.name, sub: '${info.listing.pickupPoint} · titik ambil')
             : _Stop(icon: LucideIcons.mapPin, caption: 'Ke', title: info.receiver.name, sub: '${drop.address} · alamat antar'),
+        if (drop == null && info.listing.bringsContainer) ...[const SizedBox(height: 10), PackagingNote(info.listing.packaging, compact: true)],
         const Divider(height: 24),
         Wrap(spacing: 8, runSpacing: 8, children: [
           Pill(formatDistance(meters), icon: LucideIcons.personStanding, height: 32, size: 13, weight: 700),
@@ -540,6 +542,7 @@ class _ArrivedBody extends ConsumerWidget {
           const SizedBox(width: 8),
           Expanded(child: Text(drop == null ? '${info.provider.name} · ${info.listing.pickupPoint}' : '${info.receiver.name} · ${drop.address}', style: AppTypography.text(14, color: AppColors.inkMuted))),
         ]),
+        if (drop == null && info.listing.bringsContainer) ...[const SizedBox(height: 10), PackagingNote(info.listing.packaging, compact: true)],
         const SizedBox(height: 16),
         _ChatAndAction(
           onChat: onChat,

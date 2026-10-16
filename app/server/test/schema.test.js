@@ -30,13 +30,13 @@ test('unexpected categories become unknown; the sealed_food alias maps to makana
 
 test('notes are trimmed, capped, de-duplicated, and stripped of scores and safety claims', () => {
   const r = parse(observation({
-    visible_signs: ['  jamur putih  ', 'jamur putih', '95% segar', 'aman dikonsumsi', 'x'.repeat(200), ...Array(20).fill(0).map((_, i) => `tanda ${i}`)],
+    warnings: ['  lebih dari satu makanan  ', 'lebih dari satu makanan', '95% segar', 'aman dikonsumsi', 'x'.repeat(200), ...Array(20).fill(0).map((_, i) => `tanda ${i}`)],
   }));
-  assert.equal(r.visible_signs[0], 'jamur putih');
-  assert.equal(r.visible_signs.includes('95% segar'), false);
-  assert.equal(r.visible_signs.includes('aman dikonsumsi'), false);
-  assert.equal(r.visible_signs[1].length, 80);
-  assert.equal(r.visible_signs.length, MAX_NOTES);
+  assert.equal(r.warnings[0], 'lebih dari satu makanan');
+  assert.equal(r.warnings.includes('95% segar'), false);
+  assert.equal(r.warnings.includes('aman dikonsumsi'), false);
+  assert.equal(r.warnings[1].length, 80);
+  assert.equal(r.warnings.length, MAX_NOTES);
 });
 
 test('food_name is cleared for non-food and cut to 60 characters', () => {
@@ -63,9 +63,7 @@ test('malformed answers are errors, never defaults', () => {
     '[1, 2, 3]',
     JSON.stringify(observation({ is_food: 'yes' })),
     JSON.stringify({ ...observation(), is_food: undefined }),
-    JSON.stringify(observation({ visual_condition: 'fresh' })),
     JSON.stringify(observation({ image_quality: undefined })),
-    JSON.stringify(observation({ visible_signs: 'jamur' })),
     JSON.stringify(observation({ warnings: [1, 2] })),
     JSON.stringify(observation({ food_name: 12 })),
   ];

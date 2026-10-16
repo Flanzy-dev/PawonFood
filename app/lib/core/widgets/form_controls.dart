@@ -263,7 +263,7 @@ class TimeChips extends StatelessWidget {
 
 /// Green checkbox with a label and an optional muted explanation line under it.
 class AppCheckbox extends StatelessWidget {
-  const AppCheckbox({super.key, required this.value, required this.onChanged, required this.label, this.textSize = 14, this.helper});
+  const AppCheckbox({super.key, required this.value, required this.onChanged, required this.label, this.textSize = 14, this.helper, this.enabled = true});
 
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -271,12 +271,18 @@ class AppCheckbox extends StatelessWidget {
   final double textSize;
   final String? helper;
 
+  /// Off: dimmed and not tappable; the [helper] says why.
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) => Semantics(
         checked: value,
+        enabled: enabled,
         label: helper == null ? label : '$label. $helper',
-        child: InkWell(
-          onTap: () => onChanged(!value),
+        child: Opacity(
+          opacity: enabled ? 1 : 0.5,
+          child: InkWell(
+          onTap: enabled ? () => onChanged(!value) : null,
           borderRadius: BorderRadius.circular(8),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 44),
@@ -322,6 +328,7 @@ class AppCheckbox extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
       );
 }

@@ -118,6 +118,23 @@ class DeliveryTag extends StatelessWidget {
       );
 }
 
+/// "Bawa wadah sendiri" on a food card, next to the tier tag. Icon only like [DeliveryTag]; wrapped food has no tag.
+class ContainerTag extends StatelessWidget {
+  const ContainerTag({super.key});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: Packaging.wadahSendiri.label,
+        child: Container(
+          height: 24,
+          width: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: AppColors.surfaceSand, borderRadius: BorderRadius.circular(8)),
+          child: const Icon(LucideIcons.container, size: 14, color: AppColors.accent),
+        ),
+      );
+}
+
 class DistancePill extends StatelessWidget {
   const DistancePill(this.meters, {super.key});
 

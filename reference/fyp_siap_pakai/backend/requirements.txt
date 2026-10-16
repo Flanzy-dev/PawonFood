@@ -1,9 +1,0 @@
-# Library yang dibutuhkan proyek FYP marketplace.
-# Pasang dengan:  pip install -r requirements.txt
-
-pandas>=2.0            # membaca & merapikan data
-scipy>=1.10            # tabel besar hemat memori (sparse matrix)
-numpy>=1.24            # perhitungan angka
-implicit>=0.7.2        # model rekomendasi ALS (collaborative filtering)
-fastapi>=0.110         # server API
-uvicorn>=0.29          # menjalankan server API

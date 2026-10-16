@@ -34,6 +34,7 @@ List<Override> testOverrides({DeviceLocator locator = const NoGpsLocator(), Rout
       mockDataProvider.overrideWithValue(loadMockData()),
       clockProvider.overrideWithValue(() => fixedNow),
       simulatedReplyDelayProvider.overrideWithValue(Duration.zero),
+      simulatedOfferDelayProvider.overrideWithValue(Duration.zero),
       simulatedScanDelayProvider.overrideWithValue(Duration.zero),
       randomProvider.overrideWithValue(Random(7)),
       tilesEnabledProvider.overrideWithValue(false),

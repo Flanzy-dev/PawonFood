@@ -32,6 +32,7 @@ class PublishDraft {
     this.recipe,
     this.deliveryFee,
     this.allowsPickup = true,
+    this.packaging = Packaging.dibungkus,
   });
 
   final String name;
@@ -64,6 +65,9 @@ class PublishDraft {
 
   /// "Ambil di tempat"; off for delivery-only food.
   final bool allowsPickup;
+
+  /// "Kemasan"; sealed food is always wrapped.
+  final Packaging packaging;
 }
 
 class ListingsNotifier extends Notifier<List<Listing>> {
@@ -109,6 +113,7 @@ class ListingsNotifier extends Notifier<List<Listing>> {
   /// Validates and publishes. Returns the listing, or an Indonesian error message.
   ({Listing? listing, String? error}) publish(PublishDraft d) {
     final now = ref.read(clockProvider)();
+    final packaging = d.category == FoodCategory.sealedFood ? Packaging.dibungkus : d.packaging;
     final error = (d.aiStatus == AiStatus.rejected ? 'Foto belum lolos pengecekan AI.' : null) ??
         (d.name.trim().isEmpty ? 'Nama makanan wajib diisi' : null) ??
         Validators.description(d.description) ??
@@ -116,7 +121,8 @@ class ListingsNotifier extends Notifier<List<Listing>> {
         Validators.price(d.price) ??
         Validators.pickupTime(d.pickupBy, now) ??
         Validators.deliveryFee(d.deliveryFee) ??
-        Validators.handover(d.allowsPickup, d.deliveryFee);
+        Validators.handover(d.allowsPickup, d.deliveryFee) ??
+        Validators.packaging(packaging, d.deliveryFee);
     if (error != null) return (listing: null, error: error);
     final people = ref.read(mockDataProvider).people;
     final own = state.where((l) => l.isOwn).length;
@@ -144,6 +150,7 @@ class ListingsNotifier extends Notifier<List<Listing>> {
       isOwn: true,
       deliveryFee: d.deliveryFee,
       allowsPickup: d.allowsPickup,
+      packaging: packaging,
     );
     state = [listing, ...state];
     return (listing: listing, error: null);
@@ -178,7 +185,8 @@ enum FeedFilter {
   walkable('Bisa jalan kaki'),
   warm('Sedang hangat'),
   free('Makan gratis'),
-  delivery('Bisa diantar');
+  delivery('Bisa diantar'),
+  packed('Sudah dibungkus');
 
   const FeedFilter(this.label);
   final String label;
@@ -235,6 +243,7 @@ final feedProvider = Provider<List<FeedItem>>((ref) {
     if (filters.contains(FeedFilter.warm) && !l.isWarm(now)) continue;
     if (filters.contains(FeedFilter.free) && !l.isFree) continue;
     if (filters.contains(FeedFilter.delivery) && !l.canDeliver) continue;
+    if (filters.contains(FeedFilter.packed) && l.packaging != Packaging.dibungkus) continue;
     if (category != null && l.category != category) continue;
     if (query.isNotEmpty && !matchesQuery(l, query)) continue;
     items.add(FeedItem(l, d, feedScore(l, d, radius, now, affinity: affinityOf(l, ranking))));

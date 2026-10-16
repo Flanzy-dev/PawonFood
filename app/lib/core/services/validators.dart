@@ -1,5 +1,6 @@
 import 'package:latlong2/latlong.dart';
 
+import '../models/enums.dart';
 import '../models/listing.dart';
 import 'formatters.dart';
 import 'geo.dart';
@@ -51,11 +52,16 @@ abstract final class Validators {
   }
 
   /// An offer must be above Rp0 and below the listed price; the full price goes through "Ambil" (PRD Core Feature 3).
-  static String? offerAmount(int? amount, int price) {
+  /// When the offer asks for a lower delivery fee ([feeLowered]) the food may stay at the full price: only the ongkir is haggled.
+  static String? offerAmount(int? amount, int price, {bool feeLowered = false}) {
     if (amount == null || amount <= 0) return 'Masukkan nominal tawaran';
-    if (amount >= price) return 'Tawaran harus di bawah ${formatRupiah(price)}. Mau harga penuh? Pakai tombol Ambil.';
+    if (feeLowered && amount > price) return 'Tawaran paling tinggi ${formatRupiah(price)}.';
+    if (!feeLowered && amount >= price) return 'Tawaran harus di bawah ${formatRupiah(price)}. Mau harga penuh? Pakai tombol Ambil.';
     return null;
   }
+
+  /// An offered delivery fee: from Rp0 up to the provider's [listed] fee, never above it.
+  static String? offerDeliveryFee(int fee, int listed) => fee < 0 || fee > listed ? 'Ongkir tawaran harus Rp0 sampai ${formatRupiah(listed)}.' : null;
 
   /// The provider's delivery fee: none (pickup only) or one of [deliveryFeeOptions].
   static String? deliveryFee(int? fee) => fee == null || deliveryFeeOptions.contains(fee) ? null : 'Pilih ongkir Rp0, Rp2.000 atau Rp3.000';
@@ -69,6 +75,10 @@ abstract final class Validators {
 
   /// The share form needs at least one way to hand the food over: "Ambil di tempat" or "Bisa diantar".
   static String? handover(bool allowsPickup, int? deliveryFee) => allowsPickup || deliveryFee != null ? null : 'Pilih minimal satu cara serah terima.';
+
+  /// Food the receiver brings a container for cannot be delivered.
+  static String? packaging(Packaging packaging, int? deliveryFee) =>
+      packaging == Packaging.wadahSendiri && deliveryFee != null ? 'Antar hanya untuk makanan yang sudah dibungkus.' : null;
 
   /// A receiver's request: pickup ([to] null) when the provider allows it, or delivery to [to] (see [delivery]).
   static String? handoverRequest(Listing l, LatLng? to) {

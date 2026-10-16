@@ -20,6 +20,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_chip.dart';
 import '../../core/widgets/map_cluster.dart';
 import '../../core/widgets/mini_food_card.dart';
+import '../../core/widgets/packed_filter_chip.dart';
 import 'map_pin_card.dart';
 import 'radius_indicator.dart';
 import '../../core/widgets/navigation_widgets.dart';
@@ -31,18 +32,20 @@ final mapSelectedProvider = StateProvider<String?>((ref) => null);
 
 /// Listings shown on the full map: everything within the chosen radius of the chosen location (500 m, 1 km or 2 km,
 /// picked with the round radius indicator), filtered by the category chips (shared with Beranda, so both tabs show the
-/// same category).
+/// same category) and the "Sudah dibungkus" chip (also shared).
 final mapListingsProvider = Provider<List<FeedItem>>((ref) {
   final now = ref.watch(clockProvider)();
   final here = ref.watch(locationProvider).position;
   final radius = ref.watch(radiusMetersProvider);
   final category = ref.watch(categoryFilterProvider);
+  final packedOnly = ref.watch(feedFiltersProvider).contains(FeedFilter.packed);
   final items = <FeedItem>[];
   for (final l in ref.watch(listingsProvider)) {
     if (!isVisibleListing(l, now)) continue;
     final d = distanceMeters(here, l.position);
     if (d > radius) continue;
     if (category != null && l.category != category) continue;
+    if (packedOnly && l.packaging != Packaging.dibungkus) continue;
     items.add(FeedItem(l, d));
   }
   items.sort((a, b) => a.distance.compareTo(b.distance));
@@ -171,6 +174,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
     final loc = ref.watch(locationProvider);
     final items = ref.watch(mapListingsProvider);
     final category = ref.watch(categoryFilterProvider);
+    final packedOnly = ref.watch(feedFiltersProvider).contains(FeedFilter.packed);
     final selectedId = ref.watch(mapSelectedProvider);
     FeedItem? selected;
     for (final i in items) {
@@ -266,9 +270,16 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
                               Text('Belum ada makanan di radius $radiusText', textAlign: TextAlign.center, style: AppTypography.display(20, weight: 800, height: 26)),
                               const SizedBox(height: 6),
                               Text('Coba perluas radius, atau jadilah yang pertama berbagi di ${area.split(',').first}.', textAlign: TextAlign.center, style: AppTypography.bodyMuted),
-                              if (category != null) ...[
+                              if (category != null || packedOnly) ...[
                                 const SizedBox(height: 12),
-                                AppButton(label: 'Hapus filter', variant: AppButtonVariant.outline, onPressed: () => ref.read(categoryFilterProvider.notifier).state = null),
+                                AppButton(
+                                  label: 'Hapus filter',
+                                  variant: AppButtonVariant.outline,
+                                  onPressed: () {
+                                    ref.read(categoryFilterProvider.notifier).state = null;
+                                    ref.read(feedFiltersProvider.notifier).state = {...ref.read(feedFiltersProvider)}..remove(FeedFilter.packed);
+                                  },
+                                ),
                               ],
                             ]),
                           )
@@ -371,6 +382,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TickerProviderStateM
                       AppChip(label: c?.chip ?? 'All', selected: category == c, onTap: () => ref.read(categoryFilterProvider.notifier).state = c),
                       const SizedBox(width: 8),
                     ],
+                    const PackedFilterChip(),
                   ]),
                 ),
               ],

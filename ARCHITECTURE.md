@@ -62,16 +62,15 @@ model (Alibaba Cloud Model Studio, OpenAI-compatible API) and runs a rules layer
 built with `--dart-define=PAWON_VALIDATOR_URL=...`; otherwise it keeps the simulated validator. The model key stays on
 the server.
 
-- **Qwen only observes.** It returns `is_food`, `category`, `food_name`, `visual_condition`, `visible_signs`,
+- **Qwen only observes.** It returns `is_food`, `category`, `food_name`,
   `image_quality` and `warnings`. It gives no scores, no expiry dates and no safety claims.
 - **The server decides** `listing_eligible` and `decision`:
 
 | Condition                                                   | Decision          |
 | ----------------------------------------------------------- | ----------------- |
 | Not food (`is_food` false or `bukan_makanan`)               | `rejected`        |
-| Image not `good`, or condition `cannot_assess`              | `retake`          |
-| `visible_spoilage` (mould, rot, insects)                    | `rejected`        |
-| `unknown` category or `minor_concerns`                      | `pending_review`  |
+| Image not `good`                                            | `retake`          |
+| `unknown` category                                          | `pending_review`  |
 | Otherwise                                                   | `approved`        |
 
 A failed or malformed check never approves a photo. The visual check does not certify food safety; the provider
@@ -157,7 +156,7 @@ the seller picked it.
 | Entity                 | Key fields                                                                                                                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | User                   | id, name, roles (receiver / provider), tier (`sobat_pawon` / `food_savior` / `pahlawan_pangan`), points, saved pickup point, location                                           |
-| Listing                | id, provider_id, photo_url, name, category, portions_left, original_price, price, is_free, negotiable, pickup_by, pickup_point, lat/lng, delivery_fee (null = pickup only), allows_pickup (false = delivery only), ai_status, ai_confidence, health_tags, recipe (fresh ingredients), status, created_at |
+| Listing                | id, provider_id, photo_url, name, category, portions_left, original_price, price, is_free, negotiable, pickup_by, pickup_point, lat/lng, packaging (dibungkus or wadah_sendiri; wadah_sendiri has no delivery_fee), delivery_fee (null = pickup only), allows_pickup (false = delivery only), ai_status, ai_confidence, health_tags, recipe (fresh ingredients), status, created_at |
 | Offer                  | id, listing_id, receiver_id, amount, portions, status (`pending` / `accepted` / `rejected`), delivery (address, lat/lng, fee; null = pickup) |
 | Conversation / Message | conversation per (listing, receiver); messages with sender, body, type (`text` / `offer` / `system`), created_at                                                                |
 | Pickup                 | id, offer_id, qr_token (one reservation, one scan), deadline (= listing `pickup_by`), status (`reserved` / `picked_up` / `expired` / `cancelled`), pay_method (`cash` / `qris`), paid_at, picked_up_at |

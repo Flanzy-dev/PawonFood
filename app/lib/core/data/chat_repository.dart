@@ -18,7 +18,8 @@ import 'rewards_repository.dart';
 import 'session_repository.dart';
 
 /// Conversations, offers, pickups and reviews. The other party is simulated: replies arrive after
-/// [simulatedReplyDelayProvider]. All rules mirror ARCHITECTURE.md (Claim flow).
+/// [simulatedReplyDelayProvider] (answers to an offer after [simulatedOfferDelayProvider]). All rules mirror
+/// ARCHITECTURE.md (Claim flow).
 class ChatNotifier extends Notifier<List<Conversation>> {
   var _seq = 0;
 
@@ -27,6 +28,7 @@ class ChatNotifier extends Notifier<List<Conversation>> {
 
   DateTime get _now => ref.read(clockProvider)();
   Duration get _delay => ref.read(simulatedReplyDelayProvider);
+  Duration get _offerDelay => ref.read(simulatedOfferDelayProvider);
 
   Conversation? byId(String id) {
     for (final c in state) {
@@ -98,27 +100,36 @@ class ChatNotifier extends Notifier<List<Conversation>> {
     _counterpartSays(id, reply);
   }
 
-  /// "Minta diantar" as the listing allows it: the fee always comes from the listing, never from the request.
-  Delivery? _deliveryFor(Listing l, Delivery? d) => d == null ? null : Delivery(address: d.address, position: d.position, fee: l.deliveryFee ?? 0);
+  /// "Minta diantar" as the listing allows it: the fee comes from the listing, never from [d]. Only an offer can ask for
+  /// a lower one ([fee], checked against the listing in [sendOffer]).
+  Delivery? _deliveryFor(Listing l, Delivery? d, {int? fee}) => d == null ? null : Delivery(address: d.address, position: d.position, fee: fee ?? l.deliveryFee ?? 0);
 
-  /// Receiver sends an offer, optionally with a note for the provider and a delivery request. Returns an error message
-  /// when the amount or the delivery is invalid. Nothing is reserved until the provider accepts (B10j "Menunggu jawaban").
-  /// The offer bubble only says "diantar": the provider sees the address once the reservation exists (PRD Privacy).
-  String? sendOffer(String id, int amount, {int portions = 1, String message = '', Delivery? delivery}) {
+  /// Receiver sends an offer, optionally with a note for the provider, a delivery request and a lower delivery fee
+  /// ([deliveryFee], "Tawar ongkir"; null keeps the provider's). Returns an error message when the amount, the fee or the
+  /// delivery is invalid. Nothing is reserved until the provider accepts (B10j "Menunggu jawaban"). The offer bubble only
+  /// says "diantar": the provider sees the address once the reservation exists (PRD Privacy).
+  String? sendOffer(String id, int amount, {int portions = 1, String message = '', Delivery? delivery, int? deliveryFee}) {
     final c = byId(id);
     if (c == null) return 'Percakapan tidak ditemukan';
     final l = _listing(c.listingId);
-    final error = Validators.offerAmount(amount, l.price) ?? Validators.handoverRequest(l, delivery?.position);
-    if (error != null) return error;
+    final listedFee = l.deliveryFee ?? 0;
+    final handoverError = Validators.handoverRequest(l, delivery?.position);
+    if (handoverError != null) return handoverError;
+    final fee = delivery == null ? null : deliveryFee ?? listedFee;
+    final feeError = fee == null ? null : Validators.offerDeliveryFee(fee, listedFee);
+    if (feeError != null) return feeError;
+    final feeLowered = fee != null && fee < listedFee;
+    final amountError = Validators.offerAmount(amount, l.price, feeLowered: feeLowered);
+    if (amountError != null) return amountError;
     final note = message.trim();
-    final drop = _deliveryFor(l, delivery);
+    final drop = _deliveryFor(l, delivery, fee: fee);
     _update(
       id,
       (c) => c.copyWith(
         offer: Offer(id: 'o_$id', listingId: c.listingId, receiverId: meId, amount: amount, portions: portions, delivery: drop),
         messages: [
           ...c.messages,
-          _msg(meId, MessageType.offer, 'Tawaran ${formatRupiah(amount)} · $portions porsi${drop == null ? '' : ' · diantar'}', amount: amount),
+          _msg(meId, MessageType.offer, 'Tawaran ${formatRupiah(amount)} · $portions porsi${drop == null ? '' : ' · diantar'}${feeLowered ? ' · ${_feeWords(fee)}' : ''}', amount: amount),
           if (note.isNotEmpty) _msg(meId, MessageType.text, note),
         ],
       ),
@@ -136,18 +147,36 @@ class ChatNotifier extends Notifier<List<Conversation>> {
     _addMessage(id, _msg('system', MessageType.system, 'Tawaran dibatalkan.'));
   }
 
+  /// "ongkir Rp1.000", or "gratis ongkir".
+  static String _feeWords(int fee) => fee == 0 ? 'gratis ongkir' : 'ongkir ${formatRupiah(fee)}';
+
+  /// The simulated provider answers the food price and the delivery fee together. Either one too low turns the offer
+  /// down with the lowest price for each; a part that was fine is kept in the counter.
   Future<void> _resolveOffer(String id) async {
-    await Future<void>.delayed(_delay);
+    await Future<void>.delayed(_offerDelay);
     final c = byId(id);
     if (c == null || c.offer?.status != OfferStatus.pending) return;
     final l = _listing(c.listingId);
-    switch (decideOffer(price: l.price, amount: c.offer!.amount, negotiable: l.negotiable)) {
-      case OfferAccepted():
-        _accept(id, from: c.providerId);
-      case OfferCountered(:final amount):
-        _update(id, (c) => c.copyWith(offer: c.offer!.copyWith(status: OfferStatus.rejected)));
-        _addMessage(id, _msg(c.providerId, MessageType.text, 'Maaf, paling rendah ${formatRupiah(amount)} ya.'), unread: true);
+    final offer = c.offer!;
+    final food = decideOffer(price: l.price, amount: offer.amount, negotiable: l.negotiable);
+    final offeredFee = offer.delivery?.fee;
+    final feeCounter = offeredFee == null ? null : counterDeliveryFee(fee: l.deliveryFee ?? 0, offered: offeredFee);
+    final foodCounter = switch (food) {
+      OfferCountered(:final amount) => amount,
+      OfferAccepted() => null,
+    };
+    if (foodCounter == null && feeCounter == null) {
+      _accept(id, from: c.providerId);
+      return;
     }
+    final reply = switch ((foodCounter, feeCounter)) {
+      (final int a, final int f) => 'Maaf, paling rendah ${formatRupiah(a)}, ${f == 0 ? 'gratis ongkir' : 'ongkirnya ${formatRupiah(f)}'} ya.',
+      (final int a, null) => 'Maaf, paling rendah ${formatRupiah(a)} ya.',
+      (null, final int f) => 'Maaf, ongkirnya paling rendah ${formatRupiah(f)} ya.',
+      (null, null) => '',
+    };
+    _update(id, (c) => c.copyWith(offer: offer.copyWith(status: OfferStatus.rejected, counter: foodCounter ?? offer.amount, counterFee: feeCounter ?? offeredFee)));
+    _addMessage(id, _msg(c.providerId, MessageType.text, reply), unread: true);
   }
 
   /// System line behind the accepted card (hidden in the chat, the card shows it).

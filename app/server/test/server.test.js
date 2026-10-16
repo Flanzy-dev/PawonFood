@@ -28,11 +28,10 @@ describe('POST /v1/food-validation', () => {
     });
   });
 
-  test('non-food, blurry, mouldy and unknown-category photos', async () => {
+  test('non-food, blurry and unknown-category photos', async () => {
     const cases = [
       [observation({ is_food: false, category: 'bukan_makanan', food_name: null }), 'rejected', false],
       [observation({ image_quality: 'blurry' }), 'retake', false],
-      [observation({ visual_condition: 'visible_spoilage', visible_signs: ['jamur hijau'] }), 'rejected', false],
       [observation({ category: 'kue_basah' }), 'pending_review', true],
     ];
     for (const [answer, decision, eligible] of cases) {

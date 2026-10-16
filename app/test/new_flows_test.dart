@@ -6,6 +6,9 @@ import 'package:pawonfood/core/data/pickup_points_repository.dart';
 import 'package:pawonfood/core/data/settings_repository.dart';
 import 'package:pawonfood/core/models/enums.dart';
 import 'package:pawonfood/features/map/map_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:pawonfood/core/widgets/app_button.dart';
+import 'package:pawonfood/core/widgets/app_chip.dart';
 import 'package:pawonfood/core/widgets/brand.dart';
 
 import 'support.dart';
@@ -28,6 +31,8 @@ void main() {
     usePhoneScreen(tester);
     await signIn(tester);
     await openDetail(tester, 'Ayam Goreng Lalapan'); // Rp7.000, negotiable
+    await tester.ensureVisible(find.text('Tulis sendiri')); // the Kemasan row above it pushes it down
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Tulis sendiri'));
     await tester.pumpAndSettle();
     expect(find.text('Tulis tawaranmu'), findsOneWidget);
@@ -50,6 +55,38 @@ void main() {
     expect(find.text('Saya bisa ambil sekarang.'), findsOneWidget);
     expect(find.text('Tawaran Rp5.500 diterima'), findsOneWidget);
     expect(find.text('Pilih cara bayar'), findsOneWidget);
+  });
+
+  testWidgets('B10: a turned-down offer shows "Tawar lagi" and a one-tap offer at the counter price', (tester) async {
+    usePhoneScreen(tester);
+    await signIn(tester);
+    await openDetail(tester, 'Ayam Goreng Lalapan'); // Rp7.000, negotiable
+    await tester.ensureVisible(find.text('Tulis sendiri')); // the Kemasan row above it pushes it down
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tulis sendiri'));
+    await tester.pumpAndSettle();
+    final fields = find.descendant(of: find.byType(BottomSheet), matching: find.byType(TextField));
+    await tester.enterText(fields.at(0), '2000');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(InkWell, 'Kirim tawaran · Rp2.000'));
+    await tester.pumpAndSettle();
+
+    // Below half the price: the simulated provider counters at about 60%.
+    expect(find.text('Maaf, paling rendah Rp4.000 ya.'), findsOneWidget);
+    expect(find.text('Tawaranmu belum diterima'), findsOneWidget);
+    // "Tawar lagi" is the card's button only: the quick replies lost their chip when the "+" came.
+    expect(find.widgetWithText(AppChip, 'Tawar lagi'), findsNothing);
+    expect(find.byIcon(LucideIcons.plus), findsOneWidget);
+    await tester.tap(find.widgetWithText(AppButton, 'Tawar lagi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tulis tawaranmu'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Tulis tawaranmu'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(InkWell, 'Tawar Rp4.000'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tawaran Rp4.000 diterima'), findsOneWidget);
+    expect(find.text('Tawaranmu belum diterima'), findsNothing);
   });
 
   testWidgets('B10d-B10g: QRIS says "belum masuk" first, then the payment succeeds', (tester) async {

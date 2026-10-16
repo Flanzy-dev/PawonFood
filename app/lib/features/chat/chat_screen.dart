@@ -16,19 +16,26 @@ import '../../core/motion/entrance.dart';
 import '../../core/motion/motion.dart';
 import '../../core/motion/motion_widgets.dart';
 import '../../core/services/formatters.dart';
+import '../../core/services/validators.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/app_chip.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/brand_icons.dart';
 import '../../core/widgets/info_box.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/listing_summary.dart';
 import '../../core/widgets/navigation_widgets.dart';
+import '../../core/widgets/option_row.dart';
 import '../../core/widgets/pills.dart';
 import '../listing/handover_choice.dart';
+import 'fee_offer_sheet.dart';
 import 'offer_sheet.dart';
+
+/// What the "+" menu asks to haggle over.
+enum _OfferKind { food, fee }
 
 /// B10 Chat negosiasi: listing card, offer cards, bubbles, the reservation card (B10 / B10i / B10j) and the
 /// composer. The other party is simulated.
@@ -71,13 +78,99 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _toBottom();
   }
 
-  /// "Tawar lagi": the sheet starts from the last offer's pickup or delivery choice.
+  /// "Tawar lagi": the sheet starts from the last offer's pickup or delivery choice, and from the ongkir the provider
+  /// countered with (or the one offered last).
   Future<void> _counterOffer(Listing l) async {
-    final drop = ref.read(conversationProvider(widget.conversationId))?.offer?.delivery;
+    final last = ref.read(conversationProvider(widget.conversationId))?.offer;
+    final drop = last?.delivery;
     final address = drop == null ? ref.read(pickupPointsProvider.notifier).primary : pointOf(drop);
-    final draft = await showOfferSheet(context, listing: l, address: address, delivery: drop != null);
+    final draft = await showOfferSheet(context, listing: l, address: address, delivery: drop != null, fee: last?.counterFee ?? drop?.fee);
     if (draft == null || !mounted) return;
-    final error = ref.read(chatProvider.notifier).sendOffer(widget.conversationId, draft.amount, portions: draft.portions, message: draft.message, delivery: draft.delivery);
+    final error = ref
+        .read(chatProvider.notifier)
+        .sendOffer(widget.conversationId, draft.amount, portions: draft.portions, message: draft.message, delivery: draft.delivery, deliveryFee: draft.deliveryFee);
+    if (error != null) {
+      showAppSnack(context, error);
+    } else {
+      _toBottom();
+    }
+  }
+
+  /// "Tawar RpX": offers the provider's counter price (and counter ongkir) with the last offer's portions and pickup or
+  /// delivery.
+  void _offerCounter(Listing l, Offer last) {
+    final error = ref
+        .read(chatProvider.notifier)
+        .sendOffer(widget.conversationId, last.counter!, portions: last.portions.clamp(1, l.portionsLeft), delivery: last.delivery, deliveryFee: last.counterFee);
+    if (error != null) {
+      showAppSnack(context, error);
+    } else {
+      _toBottom();
+    }
+  }
+
+  /// Where a delivery would go: the last offer's address, else the primary saved point.
+  PickupPoint _dropPoint() {
+    final drop = ref.read(conversationProvider(widget.conversationId))?.offer?.delivery;
+    return drop == null ? ref.read(pickupPointsProvider.notifier).primary : pointOf(drop);
+  }
+
+  /// "Tawar ongkir" has nothing to haggle when the provider does not deliver, the fee is already free, or the address
+  /// is out of reach. Returns the reason, or null when it can be offered.
+  String? _feeBlocked(Listing l) {
+    if (!l.canDeliver) return 'Penyedia belum membuka opsi antar.';
+    if ((l.deliveryFee ?? 0) == 0) return 'Ongkirnya sudah gratis.';
+    return Validators.delivery(l, _dropPoint().position);
+  }
+
+  /// The "+" menu (B10l): "Tawar harga makanan" opens the full offer sheet, "Tawar ongkir" the ongkir-only one.
+  Future<void> _showOfferMenu(Listing l) async {
+    final blocked = _feeBlocked(l);
+    final choice = await showAppSheet<_OfferKind>(
+      context: context,
+      builder: (ctx) => SheetBody(
+        title: 'Tawar',
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: OptionRow(
+              title: 'Tawar harga makanan',
+              subtitle: 'Harga ${formatRupiah(l.price)} per porsi',
+              selected: false,
+              lead: OptionLead.badge,
+              icon: LucideIcons.utensils,
+              chevron: true,
+              onTap: () => closeSheet(ctx, _OfferKind.food),
+            ),
+          ),
+          OptionRow(
+            title: 'Tawar ongkir',
+            subtitle: blocked ?? 'Ongkir ${formatRupiah(l.deliveryFee ?? 0)} · ${addressOf(_dropPoint())}',
+            selected: false,
+            lead: OptionLead.badge,
+            icon: LucideIcons.bike,
+            chevron: blocked == null,
+            enabled: blocked == null,
+            onTap: blocked == null ? () => closeSheet(ctx, _OfferKind.fee) : null,
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    await (choice == _OfferKind.food ? _counterOffer(l) : _offerFee(l));
+  }
+
+  /// "Tawar ongkir": the food stays where the thread stands (the provider's counter price, else the listed price), only
+  /// the delivery fee is offered lower.
+  Future<void> _offerFee(Listing l) async {
+    final last = ref.read(conversationProvider(widget.conversationId))?.offer;
+    final address = _dropPoint();
+    final amount = last?.counter ?? l.price;
+    final fee = await showFeeOfferSheet(context, listing: l, address: address, amount: amount, fee: last?.counterFee);
+    if (fee == null || !mounted) return;
+    final error = ref
+        .read(chatProvider.notifier)
+        .sendOffer(widget.conversationId, amount, portions: (last?.portions ?? 1).clamp(1, l.portionsLeft), delivery: deliveryTo(l, address), deliveryFee: fee);
     if (error != null) {
       showAppSnack(context, error);
     } else {
@@ -123,6 +216,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final waitingForAnswer = asReceiver && conv.offer?.status == OfferStatus.pending;
     final negotiating = asReceiver && !conv.closedSoldOut && conv.pickup == null && !waitingForAnswer;
     final canCounter = negotiating && listing.negotiable && !listing.isFree && !listing.isSoldOut;
+    // The last offer was turned down or taken back: the thread says so and offers the next move.
+    final declined = canCounter && (conv.offer?.status == OfferStatus.rejected || conv.offer?.status == OfferStatus.cancelled);
 
     return Scaffold(
       body: Column(
@@ -202,7 +297,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               other: other,
                               asReceiver: asReceiver,
                             )
-                          : const SizedBox(width: double.infinity),
+                          : declined
+                              ? _DeclinedCard(
+                                  key: ValueKey('declined-${conv.offer!.status}-${conv.offer!.counter}'),
+                                  offer: conv.offer!,
+                                  listing: listing,
+                                  provider: other,
+                                  onCounter: () => _counterOffer(listing),
+                                  onOfferCounter: () => _offerCounter(listing, conv.offer!),
+                                )
+                              : const SizedBox(width: double.infinity),
                 ),
                 if (conv.closedSoldOut && conv.pickup == null) Padding(padding: const EdgeInsets.only(top: 8), child: Center(child: Text('Makanan ini sudah habis.', style: AppTypography.text(13, color: AppColors.inkMuted)))),
               ],
@@ -213,6 +317,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             decoration: const BoxDecoration(color: AppColors.surface, border: Border(top: BorderSide(color: AppColors.border))),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              // Start: the quick replies hug the left edge (three chips no longer fill the width), the input row stretches.
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Quick replies only while still negotiating; once reserved the card carries the next step.
                 if (negotiating)
@@ -226,15 +332,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         AppChip(label: 'Masih ada?', selected: false, height: 44, onTap: () => _quick('Masih ada?')),
                         const SizedBox(width: 8),
                         AppChip(label: 'Bisa diantar?', selected: false, height: 44, onTap: () => _quick('Bisa diantar?')),
-                        if (canCounter) ...[
-                          const SizedBox(width: 8),
-                          AppChip(label: 'Tawar lagi', selected: false, height: 44, accentWhenUnselected: true, onTap: () => _counterOffer(listing)),
-                        ],
                       ]),
                     ),
                   ),
                 Row(
                   children: [
+                    // "+": the two things to haggle over, the food price and the ongkir (B10l).
+                    if (canCounter) ...[
+                      RoundIconButton(icon: LucideIcons.plus, semanticLabel: 'Tawar', size: 52, onTap: () => _showOfferMenu(listing)),
+                      const SizedBox(width: 12),
+                    ],
                     Expanded(
                       child: TextField(
                         controller: _input,
@@ -256,7 +363,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    RoundIconButton(icon: LucideIcons.navigation, semanticLabel: 'Kirim pesan', fill: AppColors.primary, borderColor: null, iconColor: AppColors.background, size: 52, onTap: conv.closedSoldOut ? null : _send),
+                    RoundIconButton(
+                      iconWidget: const FluentSendIcon(size: 22, color: AppColors.background),
+                      semanticLabel: 'Kirim pesan',
+                      fill: AppColors.primary,
+                      borderColor: null,
+                      size: 52,
+                      onTap: conv.closedSoldOut ? null : _send,
+                    ),
                   ],
                 ),
               ],
@@ -369,6 +483,53 @@ class _WaitingCard extends ConsumerWidget {
       );
 }
 
+/// The provider turned the offer down (or the receiver took it back) and nothing is reserved: "Tawar RpX" offers the
+/// provider's counter price in one tap, "Tawar lagi" opens "Tulis tawaranmu".
+class _DeclinedCard extends StatelessWidget {
+  const _DeclinedCard({super.key, required this.offer, required this.listing, required this.provider, required this.onCounter, required this.onOfferCounter});
+
+  final Offer offer;
+  final Listing listing;
+  final Person provider;
+  final VoidCallback onCounter;
+  final VoidCallback onOfferCounter;
+
+  @override
+  Widget build(BuildContext context) {
+    // The ongkir only counts when it is below the provider's: then the food may stay at the full price.
+    final fee = offer.delivery == null ? null : offer.counterFee;
+    final feeLowered = fee != null && fee < (listing.deliveryFee ?? 0);
+    // A counter that is not a valid offer (the full price with the full ongkir) is the "Ambil" button on the detail.
+    final counter = offer.status == OfferStatus.rejected && offer.counter != null && Validators.offerAmount(offer.counter, listing.price, feeLowered: feeLowered) == null
+        ? offer.counter
+        : null;
+    final feeWords = !feeLowered ? '' : (fee == 0 ? 'gratis ongkir' : 'ongkir ${formatRupiah(fee)}');
+    final name = shortName(provider.name);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InfoBox(
+            counter != null
+                ? '$name bisa di harga ${formatRupiah(counter)} per porsi${feeLowered ? ', $feeWords' : ''}. Kamu bisa menawar lagi.'
+                : 'Kamu bisa menawar lagi dengan harga lain.',
+            title: offer.status == OfferStatus.cancelled ? 'Tawaran dibatalkan' : 'Tawaranmu belum diterima',
+            icon: LucideIcons.info,
+            tone: InfoTone.tint,
+          ),
+          if (counter != null) ...[
+            const SizedBox(height: 12),
+            AppButton(label: 'Tawar ${formatRupiah(counter)}${feeLowered ? ' · $feeWords' : ''}', height: 52, onPressed: onOfferCounter),
+          ],
+          const SizedBox(height: 12),
+          AppButton(label: 'Tawar lagi', icon: LucideIcons.handCoins, height: 52, variant: AppButtonVariant.accent, onPressed: onCounter),
+        ],
+      ),
+    );
+  }
+}
+
 /// The reservation after "Ambil" or an accepted offer. The receiver picks how to pay, follows the route and scans
 /// the provider's QR; the provider opens that QR. No pickup code anywhere.
 class _ReservationCard extends ConsumerWidget {
@@ -395,7 +556,13 @@ class _ReservationCard extends ConsumerWidget {
     final payable = total - pickup.discount;
     final claimedFull = unit == listing.price;
     final portionsNote = portions > 1 ? ' · $portions porsi' : '';
-    final acceptedTitle = amount == 0 ? 'Ambil gratis disetujui' : (claimedFull ? 'Ambil ${formatRupiah(unit)} disetujui' : 'Tawaran ${formatRupiah(unit)} diterima$portionsNote');
+    // Only the ongkir was haggled (the food is at the listed price, the fee below the provider's): the card says so.
+    final feeHaggled = drop != null && conv.offer?.status == OfferStatus.accepted && claimedFull && drop.fee < (listing.deliveryFee ?? 0);
+    final acceptedTitle = feeHaggled
+        ? (drop.fee == 0 ? 'Gratis ongkir disetujui' : 'Ongkir ${formatRupiah(drop.fee)} disetujui')
+        : amount == 0
+            ? 'Ambil gratis disetujui'
+            : (claimedFull ? 'Ambil ${formatRupiah(unit)} disetujui' : 'Tawaran ${formatRupiah(unit)} diterima$portionsNote');
 
     late final String title;
     late final String body;
@@ -479,6 +646,10 @@ class _ReservationCard extends ConsumerWidget {
               const SizedBox(width: 6),
               Expanded(child: Text(drop == null ? 'Titik ambil: ${listing.pickupPoint}' : 'Alamat antar: ${drop.address}', style: AppTypography.text(13, height: 18, color: AppColors.inkMuted))),
             ]),
+          ],
+          if (!done && !expired && asReceiver && listing.bringsContainer) ...[
+            const SizedBox(height: 8),
+            PackagingNote(listing.packaging, compact: true),
           ],
           if (done && asReceiver && conv.review != null) ...[
             const SizedBox(height: 8),

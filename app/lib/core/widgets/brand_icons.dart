@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 
 /// Icons drawn from inline SVG paths (Iconify: logos:google-icon, ic:baseline-apple, fluent:eye-12-regular,
-/// fluent:eye-off-16-regular). Single-color icons are recolored through a color filter.
+/// fluent:eye-off-16-regular, fluent:send-16-filled). Single-color icons are recolored through a color filter.
 class _MonoSvg extends StatelessWidget {
   const _MonoSvg(this.svg, {required this.size, required this.color});
 
@@ -52,6 +52,20 @@ class FluentEyeIcon extends StatelessWidget {
 
   static const _svg =
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="#000" d="M1.974 6.659a.5.5 0 0 1-.948-.317c-.01.03 0-.001 0-.001a2 2 0 0 1 .062-.162c.04-.095.099-.226.18-.381c.165-.31.422-.723.801-1.136C2.834 3.827 4.087 3 6 3s3.166.827 3.931 1.662a5.5 5.5 0 0 1 .98 1.517l.046.113c.003.008.013.06.023.11L11 6.5s.084.333-.342.474a.5.5 0 0 1-.632-.314v-.003l-.006-.016l-.031-.078a4.5 4.5 0 0 0-.795-1.226C8.584 4.674 7.587 4 6 4s-2.584.673-3.194 1.338a4.5 4.5 0 0 0-.795 1.225l-.03.078zM6 5a2 2 0 1 0 0 4a2 2 0 0 0 0-4M5 7a1 1 0 1 1 2 0a1 1 0 0 1-2 0"/></svg>';
+
+  @override
+  Widget build(BuildContext context) => _MonoSvg(_svg, size: size, color: color);
+}
+
+/// "Kirim pesan" in the chat composer: filled paper plane (fluent:send-16-filled).
+class FluentSendIcon extends StatelessWidget {
+  const FluentSendIcon({super.key, this.size = 24, this.color = AppColors.ink});
+
+  final double size;
+  final Color color;
+
+  static const _svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#000" d="M1.724 1.053a.5.5 0 0 0-.714.545l1.403 4.85a.5.5 0 0 0 .397.354l5.69.953c.268.053.268.437 0 .49l-5.69.953a.5.5 0 0 0-.397.354l-1.403 4.85a.5.5 0 0 0 .714.545l13-6.5a.5.5 0 0 0 0-.894z"/></svg>';
 
   @override
   Widget build(BuildContext context) => _MonoSvg(_svg, size: size, color: color);

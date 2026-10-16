@@ -51,7 +51,6 @@ void main() {
       expect(await run(DemoAiMode.notFood), AiVerdict.rejected);
       expect(await run(DemoAiMode.lowConfidence), AiVerdict.pendingReview);
       expect(await run(DemoAiMode.blurry), AiVerdict.retake);
-      expect(await run(DemoAiMode.spoiled), AiVerdict.rejected);
       await expectLater(run(DemoAiMode.serverDown), throwsA(isA<ValidationUnavailable>()));
     });
 

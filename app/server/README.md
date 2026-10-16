@@ -94,7 +94,8 @@ Results on the app's own photos:
   `bahan_mentah`).
 - The app icon: `rejected` as `bukan_makanan`.
 
-None of the test photos showed spoilage, so that path is still untested on a real model. The laptop must stay on
+The check only tells food from not food. It does not judge freshness or spoilage (mouldy food passes); the provider's
+declaration covers that. The laptop must stay on
 with Ollama running, and the phone must reach the server, during a demo.
 
 ## API
@@ -110,8 +111,6 @@ multipart. The image is held in memory for the request only. It is never written
   "category": "makanan_matang",
   "food_name": "Ayam goreng",
   "description": "Ayam goreng bumbu kuning, beberapa potong paha dan dada.",
-  "visual_condition": "no_visible_issues",
-  "visible_signs": [],
   "image_quality": "good",
   "warnings": [],
   "health_signals": ["protein", "digoreng"],
@@ -124,20 +123,18 @@ multipart. The image is held in memory for the request only. It is never written
 | Field | Values |
 | --- | --- |
 | `category` | `makanan_matang`, `bahan_mentah`, `makanan_kemasan`, `bukan_makanan`, `unknown` (any other model value becomes `unknown`) |
-| `visual_condition` | `no_visible_issues`, `minor_concerns`, `visible_spoilage`, `cannot_assess` |
 | `image_quality` | `good`, `blurry`, `too_dark`, `obstructed`, `too_far` |
 | `decision` | `approved`, `pending_review`, `retake`, `rejected` |
-| `visible_signs`, `warnings` | Short Indonesian phrases, at most 8 of 80 characters each. Percentages and "safe to eat" claims are dropped. |
+| `warnings` | Short Indonesian phrases, at most 8 of 80 characters each. Percentages and "safe to eat" claims are dropped. |
 | `health_signals` | Any of `sayur_buah`, `protein`, `digoreng`, `direbus_kukus`: what is visible, not a health rating. Unknown values are dropped, a missing field means none, and non-food always gets `[]`. The app turns them into pre-selected "Pilihan sehat" tags (`direbus_kukus` without `digoreng` → Tidak digoreng; Rendah gula is never suggested) |
 
-The model fills the first eight fields. `listing_eligible`, `decision` and `reason` come only from `src/rules.js`,
+The model fills the first seven fields. `listing_eligible`, `decision` and `reason` come only from `src/rules.js`,
 checked in this order:
 
 1. Not food (`is_food: false` or `bukan_makanan`) → `rejected`
-2. `image_quality` other than `good`, or `cannot_assess` → `retake`
-3. `visible_spoilage` (mould, rot, insects) → `rejected`
-4. `unknown` category or `minor_concerns` → `pending_review` (eligible; the provider picks or confirms the category)
-5. Otherwise → `approved`
+2. `image_quality` other than `good` → `retake`
+3. `unknown` category → `pending_review` (eligible; the provider picks or confirms the category)
+4. Otherwise → `approved`
 
 Errors are `{"error": {"code", "message"}}` with a generic message. Provider status codes and bodies only go to the log.
 

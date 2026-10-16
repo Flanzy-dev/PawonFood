@@ -53,6 +53,19 @@ Setelah uji coba, segmen penerima dibuka untuk siapa saja dengan anggaran makan 
 | `sealed_food` | Makanan kemasan | Makanan dalam kemasan tersegel | Belum |
 | `bukan_makanan` | – | Ditolak otomatis oleh validator foto | Ya |
 
+### Kemasan
+
+Satu pilihan per listing, terpisah dari kategori: lauk matang pun bisa diambil dengan wadah sendiri. Penyedia memilihnya di form Bagikan.
+
+| Key | Label di UI | Artinya | Antar |
+| :--- | :--- | :--- | :--- |
+| `dibungkus` (default) | Sudah dibungkus | Makanan sudah dibungkus, penerima tinggal membawa pulang | Boleh |
+| `wadah_sendiri` | Bawa wadah sendiri | Penerima membawa wadah bersih sendiri. Mengurangi kemasan sekali pakai. | Tidak. Antar hanya untuk makanan yang sudah dibungkus. |
+
+- Makanan kemasan selalu *Sudah dibungkus*, jadi pilihan ini tidak muncul untuknya.
+- Memilih *Bawa wadah sendiri* mematikan *Bisa diantar* di form (dengan keterangan alasannya), dan listing yang sudah tayang tidak bisa memuat keduanya.
+- Penerima dilihatkan pilihan ini di kartu makanan, detail, sheet tawaran, kartu reservasi di chat, dan rute ke titik ambil.
+
 ### Harga
 
 | Metode | Di UI | Aturan |
@@ -107,30 +120,45 @@ Setiap fitur di bawah mengacu ke layar di `PawonFood UI apps.pdf`.
 
 ### 1. Beranda
 
-- Header: lokasi ("Lokasi kamu · Pogung, Sleman", bisa diketuk untuk mengganti) dan jumlah poin ("150 Poin").
-- Judul "Lapar? Masih ada yang hangat di dekatmu." dan kolom cari ("Cari lauk, nasi, roti...").
-- Chip kategori (berbahasa Inggris): *All*, *Ready-to-Eat*, *Fresh Ingredient*, *Sealed Food* (setelah MVP). Pilihan chip ikut berlaku di Peta. Filter jarak, hangat, gratis, dan bisa diantar ada di halaman Semua Makanan.
+- Header: lokasi ("Lokasi kamu · Pogung, Sleman", bisa diketuk untuk mengganti, termasuk "Gunakan lokasi saat ini" lewat GPS) dan jumlah poin ("150 Poin").
+- Judul "Lapar? Masih ada yang hangat di dekatmu." dan kolom cari ("Cari lauk, nasi, roti..."). Mengetuk kolom cari membuka halaman **Pencarian**: "Pencarian terakhir" (8 kata terakhir, bisa dihapus satu per satu) dan "Populer di sekitarmu" (kata yang cocok dengan listing yang terlihat di radius). Memilih kata menyaring feed Beranda; tombol ✕ di kolom cari menghapus saringan.
+- Chip kategori (berbahasa Inggris): *All*, *Ready-to-Eat*, *Fresh Ingredient*, *Sealed Food* (setelah MVP). Pilihan chip ikut berlaku di Peta. Setelah chip kategori ada pemisah tipis dan chip *Sudah dibungkus* (juga di Peta, satu pilihan bersama): hanya listing yang sudah dibungkus. Filter jarak, hangat, gratis, bisa diantar, dan sudah dibungkus ada di halaman Semua Makanan.
 - Mini-map: radius 1 km, posisi pengguna, 3–5 penyedia terdekat, dan tombol "Lihat peta penuh".
-- Feed "Segera habis di sekitarmu". Tiap kartu berisi foto, tanda sudah dicek AI, "Sisa N porsi", "Bisa diantar" (jika aktif), nama makanan, nama dan level penyedia, harga coret atau GRATIS, ikon chat, dan jarak.
+- Feed "Pilihan untukmu di sekitar", dengan tautan *Semua* ke halaman Semua Makanan (judul "Segera habis di sekitarmu"; filter *Bisa jalan kaki*, *Sedang hangat*, *Makan gratis*; urutan *Rekomendasi* atau *Segera habis*). Tiap kartu berisi foto, "Sisa N porsi", **satu label** di foto, ikon antar (jika aktif), ikon wadah (jika *Bawa wadah sendiri*), nama makanan, nama dan level penyedia, harga coret atau GRATIS, dan jarak.
+- Label kartu, dipilih dengan urutan ini: *Hampir habis* (sisa 1 porsi), *Segar* (bahan mentah segar), *Sehat* (skor pilihan sehat ≥ 0,5), *Populer* (penyedia Pawon Hero), *Terbaru* (dimasak kurang dari 60 menit lalu).
 
-**Urutan feed.** Aplikasi mencatat klik kartu, membuka detail lebih dari 3 detik, membuka chat, dan transaksi selesai. Setiap interaksi menaikkan bobot kategori, rentang harga, dan penyedia yang bersangkutan. Urutan kartu dihitung dengan:
+**Urutan feed.** Aplikasi mencatat klik kartu, membuka detail lebih dari 3 detik, menekan *Ambil* atau menawar, dan transaksi selesai. Urutan kartu dihitung dengan:
 
 ```
 skor = afinitas pengguna × kedekatan jarak × urgensi batas waktu
 ```
 
+Afinitas berasal dari model rekomendasi ALS yang dijalankan di server FastAPI (`ml/fyp/`). Aplikasi mengirim tiga sinyal ke server: `view` (detail dibuka 3 detik), `addtocart` (*Ambil* atau tawaran), dan `transaction` (QR berhasil dipindai). Listing yang tidak dikenal model, misalnya makanan yang baru dibagikan, mendapat afinitas netral. Tanpa server rekomendasi, feed hanya memakai kedekatan jarak dan urgensi batas waktu.
+
 ### 2. Bagikan makanan (tombol tengah)
 
 Paling banyak 3 ketukan dari membuka kamera sampai listing tayang.
 
-**Langkah 1 – Kamera.** Pratinjau kamera dengan deteksi YOLO. Kalau makanan terdeteksi, muncul kotak berlabel (misal "Lauk matang") dan teks "Makanan terdeteksi, siap difoto". Foto hanya bisa diambil dari kamera, tidak dari galeri. Ada tips foto dan tombol ganti kamera.
+**Langkah 1 – Kamera.** Pratinjau kamera polos, tanpa kotak deteksi atau garis pindai. Foto hanya bisa diambil dari kamera, tidak dari galeri. Ada tips foto dan tombol balik kamera. Tombol rana mengambil foto dan langsung membuka form; pengecekan AI berjalan di latar belakang.
 
 **Langkah 2 – Cek sebelum tayang.** Teks: "Semua sudah diisi. Cek sebentar, lalu bagikan."
-- Kategori terisi otomatis dari hasil deteksi, bisa diganti lewat *Ubah*. Ada keterangan "Foto lolos validasi".
+- Kategori, nama makanan, deskripsi, dan tag *Pilihan sehat* (Sayur/buah, Protein, Tidak digoreng, Rendah gula) terisi otomatis dari hasil cek AI begitu hasilnya datang. Kategori bisa diganti lewat *Ubah*. Isian yang sudah diubah penyedia tidak pernah ditimpa. Tag Pilihan sehat menggambarkan komposisi, bukan keamanan.
+- Hasil cek AI menentukan apakah listing boleh tayang:
+
+  | Hasil | Tampilan di form | Boleh tayang? |
+  | :--- | :--- | :--- |
+  | Lolos | "Foto lolos validasi", isian terisi | Ya |
+  | Perlu tinjauan | "Menunggu tinjauan manual" dan "Catatan AI"; kategori yang tidak dikenal dipilih penyedia | Ya, setelah kategori dipilih |
+  | Foto kurang jelas | "Foto belum lolos", kotak "Foto kurang jelas", tombol *Foto ulang* | Tidak |
+  | Ditolak | Bukan makanan (orang, benda, layar, foto dari foto) | Tidak |
+  | Pemeriksaan gagal | "Pemeriksaan AI gagal", tombol *Coba lagi* dan *Foto ulang* | Tidak. Kegagalan tidak pernah dianggap lolos. |
+
 - Nama makanan dan jumlah porsi ("Sisa berapa porsi?").
+- *Kemasan*: *Sudah dibungkus* (default) atau *Bawa wadah sendiri*, dengan satu baris keterangan. Tidak muncul untuk makanan kemasan. Memilih *Bawa wadah sendiri* mematikan *Bisa diantar* ("Antar hanya untuk makanan yang sudah dibungkus.").
 - Pilihan Gratis atau Jual murah, harga per porsi, dan checkbox "Boleh ditawar".
-- Serah terima: *Ambil di tempat* (aktif secara default) dan *Bisa diantar (< 1 km)*. Kalau antar diaktifkan, penyedia memilih ongkir Rp0, Rp2.000, atau Rp3.000.
-- Batas waktu (19.00 / 20.30 / 22.00).
+- Serah terima: *Ambil di tempat* (aktif secara default) dan *Bisa diantar (< 1 km)*. Kalau antar diaktifkan, penyedia memilih ongkir Rp0, Rp2.000, atau Rp3.000. Minimal salah satu dari keduanya harus aktif.
+- Batas waktu: tiga pilihan jam, atau *Atur jam* untuk jam sendiri (paling cepat 30 menit dan paling lambat 6 jam dari sekarang).
+- Untuk bahan mentah, penyedia bisa melampirkan **ide resep** dari pustaka resep aplikasi. Resep ini tampil di detail sebagai "Diverifikasi pemberi".
 - Titik temu diambil dari profil (misal "Kos Melati, Pogung") dan bisa diganti khusus untuk listing ini. Penerima baru melihat titik ini setelah reservasi disetujui.
 - Pernyataan: "Dengan membagikan, kamu menjamin makanan ini masih layak makan."
 - Tombol "Bagikan sekarang".
@@ -142,19 +170,23 @@ Paling banyak 3 ketukan dari membuka kamera sampai listing tayang.
 - Membuka halaman ini dicatat sebagai klik, beserta lama melihatnya, untuk urutan feed.
 - Foto dengan label "Sisa 2 porsi" dan "Foto asli, dicek AI".
 - Foto profil, nama, level, dan rating penyedia.
-- Info singkat: jarak (300 m, jalan kaki), batas ambil (20.30 hari ini), kategori.
+- Info singkat: jarak (300 m, jalan kaki), batas ambil (20.30 hari ini), kategori, baris **Kemasan** ("Sudah dibungkus · Bisa langsung dibawa pulang" atau "Bawa wadah sendiri · Siapkan wadah bersih untuk makanan ini"), dan tag *Pilihan sehat* ("Diisi oleh pemberi, dibantu AI.").
 - Harga: ~~Rp15.000~~ Rp5.000, dengan label "Bisa ditawar".
 - Pilihan *Ambil sendiri (Rp0)* atau *Minta diantar (+ongkir)*, kalau penyedia membuka opsi antar.
-- Chip "Tawar cepat": Rp3.000, Rp4.000, atau *Tulis sendiri*. *Tulis sendiri* membuka bottom sheet berisi harga tawaran per porsi, jumlah porsi (maksimal sisa stok), pilihan ambil/antar, dan pesan opsional. Tawaran harus di atas Rp0 dan di bawah harga jual. Tawaran masuk ke chat dengan status "Menunggu jawaban". Porsi baru dikunci setelah penyedia menerima.
+- Chip "Tawar cepat": Rp3.000, Rp4.000, atau *Tulis sendiri*. *Tulis sendiri* membuka bottom sheet berisi harga tawaran per porsi, jumlah porsi (maksimal sisa stok), pilihan ambil/antar, *Tawar ongkir* (kalau minta diantar: chip dari ongkir penyedia turun per Rp1.000 sampai *Gratis*), dan pesan opsional. Tawaran harus di atas Rp0 dan di bawah harga jual; kalau ongkirnya ikut ditawar, harga makanan boleh sama dengan harga jual. Ongkir tawaran tidak boleh di atas ongkir penyedia. Tawaran masuk ke chat dengan status "Menunggu jawaban". Porsi baru dikunci setelah penyedia menerima.
 - Deskripsi singkat dari penyedia tentang kondisi atau cara simpan makanan.
+- **Ide resep** (hanya bahan mentah, dan tidak tampil di listing milik sendiri). Resep yang dilampirkan penyedia berlabel "Diverifikasi pemberi". Kalau penyedia tidak melampirkan, penerima tetap melihat resep pustaka yang paling cocok, berlabel "Belum diverifikasi pemberi".
 - Tombol bawah: *Chat* dan *Ambil · Rp5.000*. Total berubah kalau memilih diantar.
 
 ### 4. Peta
 
 - Header "Radius 1 km dari Pogung, Sleman" dan tombol kembali ke lokasi saya.
-- Chip kategori yang sama dengan Beranda.
+- Chip kategori yang sama dengan Beranda, ditambah chip *Sudah dibungkus*.
 - Pin berlabel harga ("Rp5.000", "Gratis"), garis radius putus-putus, dan kartu di bawah ("300 m · ± 4 mnt jalan kaki"). Mengetuk kartu membuka detail makanan.
 - Pin yang berdekatan digabung menjadi satu angka (misal "5" di Pogung).
+- Mengetuk pin menggeser peta ke pin itu dan membuka **kartu pin** (foto, nama, penyedia, sisa porsi, batas ambil, harga, jarak jalan kaki) yang menggantikan daftar di bawah. Tombol ✕ atau mengetuk peta kosong menutup kartu.
+- Indikator "1 km" di pojok peta membuka pilihan **Jangkauan pencarian**. Radius yang dipilih juga berlaku di Beranda; pengaturan "Radius default" ada di Pengaturan. Kalau tidak ada makanan di radius, peta menampilkan "Belum ada makanan di radius X".
+- Peta dan rute memakai ubin dan router jalan kaki OpenStreetMap. Perlu internet; tanpa internet aplikasi menampilkan rute perkiraan.
 
 ### 5. Chat dan tawar-menawar
 
@@ -162,11 +194,16 @@ Paling banyak 3 ketukan dari membuka kamera sampai listing tayang.
 - Tiap percakapan menampilkan nama penyedia, makanan, harga sepakat, cara serah terima, pesan terakhir, dan status (*Tawaran diterima*, *Siap diambil*, *Habis*).
 - Banner: "Tawar dan atur waktu ambil di sini saja. Jangan transfer uang di luar aplikasi sebelum makanan kamu terima."
 - Di dalam chat: ringkasan makanan di atas, gelembung tawaran ("Tawaran kamu · Rp4.000 · 1 porsi · ambil jalan kaki ±4 mnt"), lalu chat biasa. Setelah diterima muncul kartu "Tawaran Rp4.000 diterima", keterangan "Bayar Rp4.000 di tempat", dan tombol "Pindai QR" untuk penerima.
-- Balasan cepat: *Saya OTW*, *Bisa diantar?*, *Masih ada?*, *Tawar lagi*.
+- Untuk makanan *Bawa wadah sendiri*, kartu reservasi, sheet tawaran, dan rute ke titik ambil menampilkan pengingat "Bawa wadah sendiri · Siapkan wadah bersih untuk makanan ini".
+- Balasan cepat: *Saya OTW*, *Masih ada?*, *Bisa diantar?*.
+- Tombol *+* di kiri kolom pesan (hanya selama masih bisa menawar) membuka sheet *Tawar* dengan dua pilihan: *Tawar harga makanan* (form *Tulis tawaranmu*) dan *Tawar ongkir* (sheet kecil: chip ongkir dari ongkir penyedia turun per Rp1.000 sampai *Gratis*, harga makanan tetap). *Tawar ongkir* nonaktif dengan alasannya bila penyedia tidak mengantar, ongkirnya sudah gratis, atau alamat lebih dari 1 km. Kalau harga makanan tetap penuh dan hanya ongkir yang turun, kartu kesepakatan berjudul "Ongkir Rp2.000 disetujui".
+- Kalau tawaran ditolak atau dibatalkan, chat menampilkan kartu "Tawaranmu belum diterima" dengan harga terendah dari penyedia (makanan dan ongkir), tombol sekali tap "Tawar Rp4.500 · ongkir Rp2.000", dan tombol *Tawar lagi*.
 
 ### 6. Reservasi dan serah terima
 
 **Reservasi.** Membeli dengan harga penuh atau tawaran yang diterima akan mengunci jumlah porsi dan cara serah terima sampai batas waktu. Lewat batas waktu, reservasi batal dan porsi tersedia lagi.
+
+**Rute.** Setelah reservasi, penerima bisa membuka rute jalan kaki ke titik ambil dari posisi GPS (atau area yang dipilih kalau GPS tidak terbaca), dengan jarak, perkiraan waktu, dan petunjuk belokan berbahasa Indonesia. Layar berpindah ke "Kamu sudah sampai" dalam jarak 30 m. Untuk pesanan antar, penyedia mendapat "Rute antar" ke alamat penerima.
 
 **Konfirmasi QR.** Penyedia membuka QR reservasi di aplikasinya. Penerima memindainya lewat tombol "Pindai QR", baik saat mengambil di titik temu maupun saat makanan diantar ke kos. Tidak ada kode manual. Satu QR untuk satu reservasi, hanya bisa dipindai sekali, dan hanya berlaku sebelum batas waktu.
 
@@ -178,7 +215,8 @@ Setelah QR berhasil dipindai:
 
 **Cara bayar** (Figma lo-fi B10d–B10i, C17d). Muncul setelah tawaran diterima atau setelah menekan *Ambil*. Listing gratis tanpa ongkir melewati langkah ini.
 - *Tunai* (default MVP): penerima kembali ke chat dan membayar tunai ke penyedia setelah memindai QR.
-- *Bayar di aplikasi* (**setelah MVP, usulan**): QRIS lewat Midtrans atau Xendit. Uang ditahan PawonFood dan diteruskan utuh (harga + ongkir) ke saldo penyedia setelah QR dipindai. Kalau reservasi batal, uang kembali penuh ke penerima. Biaya QRIS ditanggung PawonFood dari pendapatan iklan.
+- *Bayar di aplikasi* (**setelah MVP, usulan**): QRIS lewat Midtrans atau Xendit. Uang ditahan PawonFood dan diteruskan utuh (harga + ongkir) ke saldo penyedia setelah QR dipindai. Kalau reservasi batal, uang kembali penuh ke penerima. Biaya QRIS ditanggung PawonFood dari pendapatan iklan. Layar dan alurnya sudah ada di aplikasi, tapi QRIS disimulasikan (cek status pertama menjawab "belum masuk", yang kedua berhasil) dan belum terhubung ke payment gateway.
+- Penerima harus mencentang persetujuan kondisi makanan (lihat Keamanan Pangan) sebelum tombol bayar aktif.
 
 ### 7. Rating dan ulasan
 
@@ -190,12 +228,15 @@ Setelah QR berhasil dipindai:
 ### 8. Profil dan poin
 
 - Peran dan lokasi: "Penerima dan penyedia · Pogung, Sleman".
-- Level: Pawon Friend → Pawon Elite → Pawon Hero, dengan progres "[X] poin lagi untuk naik ke Pawon Elite". Jangan memakai istilah "Borjuis" untuk level apa pun.
-- Statistik: porsi dibagikan, porsi diselamatkan, kg makanan yang tidak jadi sampah.
+- Level: Pawon Friend → Pawon Elite → Pawon Hero, dengan progres "340 poin lagi untuk naik ke Pawon Elite" dan langkah *Sekarang / Berikutnya / Top Impact*. Jangan memakai istilah "Borjuis" untuk level apa pun.
+- Statistik "Dampak kamu": porsi dibagikan, porsi diselamatkan, kg makanan yang tidak jadi sampah.
 - Poin dampak: penyedia mendapat poin saat QR dipindai (lebih banyak untuk makanan gratis). Penerima mendapat poin saat pengambilan selesai dan saat memberi ulasan.
-- Tukar poin: voucher minimarket, diskon ojek, dan sertifikat Dapur/Resto Peduli Lingkungan.
-- **Usulan:** voucher potongan Rp3.000 atau Rp5.000 yang dipakai di halaman bayar. Maksimal 1 voucher per transaksi, pembayaran minimal Rp1.000. Selisihnya ditanggung PawonFood, jadi penyedia tetap menerima harga penuh.
-- Menu: riwayat berbagi dan mengambil, titik ambil tersimpan, keamanan pangan dan persetujuan, pengaturan.
+- **Asumsi di aplikasi** (belum diputuskan tim, daftar lengkap di [app/README.md](app/README.md)): batas level 0 / 500 / 1.500 poin; penyedia +10 poin per porsi, dikali dua untuk makanan gratis, ditambah +5 untuk rating 4 ke atas; 0,5 kg makanan per porsi terselamatkan.
+- Tukar poin (kategori *Belanja*, *Antar*, *Makanan*, *Sertifikat*): voucher minimarket, diskon layanan antar, voucher pulsa, potongan makanan, dan sertifikat Dapur/Resto Peduli Lingkungan. Menukar mengurangi poin dan menghasilkan kode `PWN-V-XXXX` yang berlaku 30 hari. Kode tersimpan di *Voucher saya*. Penukaran masih disimulasikan di memori.
+- Sertifikat Resto Peduli Lingkungan tidak dibeli dengan poin: terbit bulanan untuk penyedia dengan minimal 30 porsi dan rata-rata rating 4,5 (asumsi aplikasi).
+- Voucher *Potongan makanan* Rp3.000 atau Rp5.000 (120 dan 200 poin) dipakai di halaman bayar lewat "Pakai voucher": pilih dari *Voucher saya* atau ketik kodenya. Maksimal 1 voucher per transaksi, pembayaran minimal Rp1.000, dan voucher partner (minimarket, ojek) ditolak di sini. Voucher baru berstatus "Terpakai" saat pembayaran dikonfirmasi. Selisihnya ditanggung PawonFood, jadi penyedia tetap menerima harga penuh.
+- Menu: riwayat berbagi dan mengambil, riwayat poin, titik ambil tersimpan, keamanan pangan dan persetujuan, pengaturan (notifikasi, radius default, ubah kata sandi), bantuan, syarat dan ketentuan, kebijakan privasi.
+- Onboarding tiga layar tampil sekali pada peluncuran pertama di sebuah perangkat, sebelum Welcome.
 
 ### 9. Landing page (`PawonFood UI.pdf`)
 
@@ -212,7 +253,8 @@ Iklan adalah sumber pendapatan utama dan yang memungkinkan PawonFood tidak menga
 ## Keamanan Pangan
 
 - PawonFood adalah tempat bertemunya penjual dan pembeli, bukan produsen makanan.
-- Foto harus diambil dari kamera aplikasi dan lolos deteksi YOLO. Foto dari internet atau objek yang bukan makanan ditolak.
+- Foto harus diambil dari kamera aplikasi dan lolos cek AI. Foto dari internet atau objek yang bukan makanan ditolak.
+- Cek AI hanya memastikan foto menunjukkan makanan. Cek ini tidak menilai kesegaran atau basi, dan bukan sertifikat keamanan pangan. Karena itu pernyataan kelayakan dari penyedia tetap wajib.
 - Penyedia harus menyetujui pernyataan kelayakan makanan sebelum listing tayang.
 - Penerima harus mencentang "Saya telah memeriksa kondisi makanan dan membebaskan PawonFood dari tuntutan kesehatan" di halaman bayar sebelum tombol konfirmasi aktif.
 - Setiap listing punya batas waktu ambil/antar supaya makanan tidak disimpan terlalu lama.
@@ -228,9 +270,9 @@ Iklan adalah sumber pendapatan utama dan yang memungkinkan PawonFood tidak menga
 | Hubungan pelanggan | Feed yang menyesuaikan kebiasaan pengguna, poin dan hadiah, rating terbuka, chat untuk tawar-menawar dan janjian. |
 | Pendapatan | Utama: iklan dari brand FMCG ramah lingkungan (setelah MVP). Tambahan: *promoted listing* di posisi atas feed dan peta. Tidak ada komisi transaksi. |
 | Aktivitas utama | Pengembangan aplikasi dan sistem rekomendasi, moderasi laporan pengguna, pemasaran dan edukasi komunitas. |
-| Sumber daya utama | Server, database, Maps API, model YOLO di perangkat, tim inti, dan basis pengguna yang padat di satu area. |
-| Mitra | NGO lingkungan (misal Zero Waste Indonesia), Midtrans/Xendit, Google Maps, kampus, panti asuhan. |
-| Biaya | Hosting dan API berbayar, pemasaran (termasuk stiker QR di warung dan kos mitra), operasional tim. |
+| Sumber daya utama | Server dan database, model AI (cek foto dan rekomendasi feed), peta OpenStreetMap, tim inti, dan basis pengguna yang padat di satu area. |
+| Mitra | NGO lingkungan (misal Zero Waste Indonesia), Midtrans/Xendit, komunitas OpenStreetMap, kampus, panti asuhan. |
+| Biaya | Hosting, layanan model AI untuk cek foto, biaya QRIS, pemasaran (termasuk stiker QR di warung dan kos mitra), operasional tim. |
 
 ## Pembanding
 
@@ -253,7 +295,7 @@ Versi singkat untuk pitching: GoFood dan ShopeeFood melayani restoran yang sangg
 Alur yang harus jalan dari awal sampai akhir:
 
 ```
-foto dari kamera → deteksi YOLO → atur harga & cara serah terima → tayang di feed & peta
+foto dari kamera → cek foto AI → atur harga & cara serah terima → tayang di feed & peta
 → tawar/beli → reservasi → pindai QR
 ```
 
@@ -271,6 +313,10 @@ Per implementasi 75 layar hi-fi dari Figma:
 - Sudah ada tapi masih memakai data mock (belum ada backend atau payment gateway): pembayaran QRIS, reset kata sandi, iklan setelah ulasan (gambar dan video), halaman pengaturan dan bantuan.
 - Ketiga kategori sudah ada di UI, tapi model baru mengenali dua kelas. Makanan kemasan masih dipilih manual.
 - Reservasi dengan batas waktu, halaman "Pilih cara bayar", rute jalan kaki, QR penyedia, dan pemindai penerima sudah dibuat. Pemindaian antar-perangkat masih disimulasikan di memori.
+- Cek foto AI berjalan lewat satu antarmuka (`FoodValidator`) dengan tiga mesin: (1) simulasi aturan YOLO, yang menjadi default; (2) server `app/server/` yang meminta model vision Qwen mendeskripsikan foto, lalu aturan di server memutuskan hasilnya (kunci model hanya di server; aplikasi memakainya kalau dijalankan dengan `PAWON_VALIDATOR_URL`); (3) YOLOv8 Nano → TFLite di perangkat, yang belum dilatih.
+- Rekomendasi feed: model ALS dari anggota tim berjalan di `ml/fyp/` dan sudah tersambung ke Beranda lewat `PAWON_FYP_URL`. Datanya berasal dari dataset lain, jadi akun demo dipetakan ke satu pengguna model dan listing mock membawa id item model.
+- Landing page: kode Next.js 16 (TypeScript) ada di `web/` dan memakai salinan dari susunan di `DESIGN_SYSTEM.md`. Tautan toko aplikasi dan email kontak belum diisi.
+- Tes: 249 tes otomatis Flutter lulus dan `flutter analyze` bersih; 50 tes lulus di `app/server` (dijalankan 16 Oktober 2026).
 
 ## Metrik
 
@@ -289,8 +335,8 @@ Untuk presentasi, gunakan format: "Jika 50 dapur dan warung bergabung, X kg maka
 ## Pertanyaan Terbuka
 
 **Angka dan aturan yang belum ditentukan**
-- Placeholder di mockup: format `[RATING]`, ambang `[X] poin` tiap level, harga tukar voucher, rumus `[X] kg`, `[Nama kamu]`, dan `[EMAIL TIM]`.
-- Cara menghitung poin: per porsi atau per transaksi, dan seberapa besar selisih poin makanan gratis dibanding berbayar.
+- Placeholder di mockup: format `[RATING]`, ambang `[X] poin` tiap level, harga tukar voucher, rumus `[X] kg`, `[Nama kamu]`, dan `[EMAIL TIM]`. Aplikasi sementara memakai angka asumsi (lihat Profil dan poin); `[EMAIL TIM]` masih berupa placeholder.
+- Cara menghitung poin: per porsi atau per transaksi, dan seberapa besar selisih poin makanan gratis dibanding berbayar. Asumsi aplikasi: per porsi, makanan gratis dikali dua.
 - Berapa ulasan buruk yang memicu suspensi, dan berapa yang memicu blokir.
 - Batas ongkir antar. Usulan: maksimal Rp3.000 supaya tetap jauh di bawah tarif ojek online.
 

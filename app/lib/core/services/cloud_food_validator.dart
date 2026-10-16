@@ -102,7 +102,6 @@ ValidationResult parseCloudValidation(Object? json) {
   }
   final isFood = field<bool>('is_food');
   if (!isFood && eligible) throw const FormatException('non-food marked eligible');
-  final visual = VisualCondition.tryKey(field<String>('visual_condition')) ?? (throw const FormatException('unknown visual_condition'));
   final quality = ImageQuality.tryKey(field<String>('image_quality')) ?? (throw const FormatException('unknown image_quality'));
 
   final categoryKey = field<String>('category');
@@ -132,9 +131,7 @@ ValidationResult parseCloudValidation(Object? json) {
     message: reason.isEmpty ? null : reason,
     suggestedName: foodName.isEmpty ? null : foodName,
     suggestedDescription: description.isEmpty ? null : description,
-    visualCondition: visual,
     imageQuality: quality,
-    visibleSigns: notes('visible_signs'),
     warnings: notes('warnings'),
     suggestedHealthTags: eligible && signals is List ? healthTagsFromSignals({for (final k in signals) ?HealthSignal.tryKey(k)}) : const {},
   );

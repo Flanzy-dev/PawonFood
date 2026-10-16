@@ -26,6 +26,10 @@ final randomProvider = Provider<Random>((ref) => Random());
 /// How long the simulated counterpart takes to answer in chat.
 final simulatedReplyDelayProvider = Provider<Duration>((ref) => const Duration(milliseconds: 1500));
 
+/// How long the simulated provider takes to answer an offer (B10j "Menunggu jawaban"): long enough to tap
+/// "Batalkan tawaran" while waiting. Plain chat replies keep [simulatedReplyDelayProvider].
+final simulatedOfferDelayProvider = Provider<Duration>((ref) => const Duration(seconds: 8));
+
 /// How long the simulated QR scan takes: the receiver's camera finding the code (B10b), and the mock receiver
 /// scanning the provider's QR (C17).
 final simulatedScanDelayProvider = Provider<Duration>((ref) => const Duration(milliseconds: 2500));

@@ -197,6 +197,7 @@ void main() {
       await pumpEventQueue();
       final conv = c.read(conversationProvider(id))!;
       expect(conv.offer!.status, OfferStatus.rejected);
+      expect(conv.offer!.counter, 5000);
       expect(conv.pickup, isNull);
       expect(conv.messages.last.body, 'Maaf, paling rendah Rp5.000 ya.');
     });
@@ -244,6 +245,27 @@ void main() {
       conv = c.read(conversationProvider(id))!;
       expect(conv.offer!.status, OfferStatus.cancelled);
       expect(conv.pickup, isNull);
+    });
+
+    test('a cancelled offer stays cancelled: the answer that was on its way is dropped and nothing is held', () async {
+      // A real wait for the provider, so the cancel lands before the answer.
+      final c = ProviderContainer(overrides: [...testOverrides(), simulatedOfferDelayProvider.overrideWithValue(const Duration(milliseconds: 60))]);
+      addTearDown(c.dispose);
+      c.read(sessionProvider.notifier).login('rafi@email.com');
+      final chat = c.read(chatProvider.notifier);
+      final id = chat.openForListing('l_campur'); // Rp8.000: an offer of Rp5.000 would be accepted
+      final before = c.read(listingByIdProvider('l_campur'))!.portionsLeft;
+      expect(chat.sendOffer(id, 5000), isNull);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(c.read(conversationProvider(id))!.offer!.status, OfferStatus.pending, reason: 'still waiting for the provider');
+      chat.cancelOffer(id);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final conv = c.read(conversationProvider(id))!;
+      expect(conv.offer!.status, OfferStatus.cancelled);
+      expect(conv.pickup, isNull);
+      expect(conv.messages.last.body, 'Tawaran dibatalkan.');
+      expect(c.read(listingByIdProvider('l_campur'))!.portionsLeft, before);
     });
 
     test('paying: cash is a choice, QRIS answers "belum" first and then succeeds', () async {

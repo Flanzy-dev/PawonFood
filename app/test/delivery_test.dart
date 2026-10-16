@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:pawonfood/core/data/chat_repository.dart';
 import 'package:pawonfood/core/data/listings_repository.dart';
+import 'package:pawonfood/core/data/providers.dart';
 import 'package:pawonfood/core/data/session_repository.dart';
 import 'package:pawonfood/core/mock/mock_data.dart';
 import 'package:pawonfood/core/models/conversation.dart';
@@ -12,6 +14,9 @@ import 'package:pawonfood/core/models/enums.dart';
 import 'package:pawonfood/core/services/formatters.dart';
 import 'package:pawonfood/core/services/geo.dart';
 import 'package:pawonfood/core/theme/app_theme.dart';
+import 'package:pawonfood/core/widgets/app_button.dart';
+import 'package:pawonfood/core/widgets/app_chip.dart';
+import 'package:pawonfood/core/widgets/brand_icons.dart';
 import 'package:pawonfood/core/widgets/food_card.dart';
 import 'package:pawonfood/features/chat/chat_screen.dart';
 import 'package:pawonfood/features/listing/listing_detail_screen.dart';
@@ -75,6 +80,49 @@ void main() {
       expect(conv.offer!.deliveryFee, 3000);
       expect(conv.messages.map((m) => m.body), contains(startsWith('Boleh, saya antar sebelum')));
       expect(c.read(reservationProvider(id))!.total, 10000);
+    });
+
+    test('"Tawar ongkir": a lower fee goes into the bubble and, once accepted, into the total', () async {
+      final c = signedIn();
+      final chat = c.read(chatProvider.notifier);
+      final id = chat.openForListing('l_campur'); // Rp8.000, ongkir Rp3.000
+      // Only the ongkir is haggled, so the food may stay at the full price.
+      expect(chat.sendOffer(id, 8000, delivery: melati, deliveryFee: 2000), isNull);
+      expect(c.read(conversationProvider(id))!.messages.last.body, 'Tawaran Rp8.000 · 1 porsi · diantar · ongkir Rp2.000');
+      await pumpEventQueue();
+      final conv = c.read(conversationProvider(id))!;
+      expect(conv.offer!.status, OfferStatus.accepted, reason: 'half the fee or more is fine');
+      final r = c.read(reservationProvider(id))!;
+      expect((r.amount, r.deliveryFee, r.total), (8000, 2000, 10000));
+    });
+
+    test('"Tawar ongkir" is checked: never above the provider\'s fee, and the full price needs a lower fee', () {
+      final c = signedIn();
+      final chat = c.read(chatProvider.notifier);
+      final id = chat.openForListing('l_campur');
+      expect(chat.sendOffer(id, 7000, delivery: melati, deliveryFee: 5000), 'Ongkir tawaran harus Rp0 sampai Rp3.000.');
+      expect(chat.sendOffer(id, 8000, delivery: melati, deliveryFee: 3000), 'Tawaran harus di bawah Rp8.000. Mau harga penuh? Pakai tombol Ambil.');
+      expect(chat.sendOffer(id, 9000, delivery: melati, deliveryFee: 0), 'Tawaran paling tinggi Rp8.000.');
+      expect(c.read(conversationProvider(id))!.messages, isEmpty);
+    });
+
+    test('an ongkir that is too low gets a counter for the fee, and a low price a counter for both', () async {
+      final c = signedIn();
+      final chat = c.read(chatProvider.notifier);
+      final id = chat.openForListing('l_campur');
+      expect(chat.sendOffer(id, 7000, delivery: melati, deliveryFee: 1000), isNull);
+      await pumpEventQueue();
+      var conv = c.read(conversationProvider(id))!;
+      expect(conv.offer!.status, OfferStatus.rejected);
+      expect((conv.offer!.counter, conv.offer!.counterFee), (7000, 2000), reason: 'the price was fine and stays');
+      expect(conv.messages.last.body, 'Maaf, ongkirnya paling rendah Rp2.000 ya.');
+
+      expect(chat.sendOffer(id, 1000, delivery: melati, deliveryFee: 0), isNull);
+      await pumpEventQueue();
+      conv = c.read(conversationProvider(id))!;
+      expect((conv.offer!.counter, conv.offer!.counterFee), (5000, 2000));
+      expect(conv.messages.last.body, 'Maaf, paling rendah Rp5.000, ongkirnya Rp2.000 ya.');
+      expect(conv.pickup, isNull);
     });
 
     test('free food delivered for free shows as "Siap diantar" and needs no payment', () async {
@@ -217,6 +265,140 @@ void main() {
       expect(conv.offer!.delivery!.address, 'Kos Melati, Pogung');
       expect(find.text('Pilih cara bayar'), findsOneWidget);
       expect(find.text('Lihat rute'), findsNothing, reason: 'the provider brings the food');
+    });
+
+    testWidgets('"Tulis tawaranmu" offers a lower ongkir; the counter comes back as one tap', (tester) async {
+      await openDetail(tester, 'l_campur'); // Rp8.000, ongkir Rp3.000
+      await tester.ensureVisible(find.text('Minta diantar'));
+      await tester.tap(find.text('Minta diantar'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Tulis sendiri'));
+      await tester.tap(find.text('Tulis sendiri'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tawar ongkir'), findsOneWidget);
+      for (final chip in ['Rp3.000', 'Rp2.000', 'Rp1.000', 'Gratis']) {
+        expect(find.descendant(of: find.byType(BottomSheet), matching: find.text(chip)), findsOneWidget);
+      }
+      await tester.tap(find.text('Rp1.000'));
+      final fields = find.descendant(of: find.byType(BottomSheet), matching: find.byType(TextField));
+      await tester.enterText(fields.at(0), '7000');
+      await tester.pumpAndSettle();
+      expect(find.text('+ ongkir Rp1.000'), findsOneWidget);
+      await tester.ensureVisible(find.widgetWithText(InkWell, 'Kirim tawaran · Rp7.000'));
+      await tester.tap(find.widgetWithText(InkWell, 'Kirim tawaran · Rp7.000'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 porsi · diantar · ongkir Rp1.000'), findsOneWidget);
+      expect(find.text('Maaf, ongkirnya paling rendah Rp2.000 ya.'), findsOneWidget);
+      expect(find.textContaining('bisa di harga Rp7.000 per porsi, ongkir Rp2.000. Kamu bisa menawar lagi.'), findsOneWidget);
+      await tester.tap(find.widgetWithText(InkWell, 'Tawar Rp7.000 · ongkir Rp2.000'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tawaran Rp7.000 diterima'), findsOneWidget);
+    });
+
+    /// A signed-in container with a thread for [listingId], shown in the chat screen.
+    Future<(ProviderContainer, String)> openChat(WidgetTester tester, String listingId, {void Function(ChatNotifier chat, String id)? setUp}) async {
+      usePhoneScreen(tester);
+      final container = ProviderContainer(overrides: testOverrides());
+      addTearDown(container.dispose);
+      container.read(sessionProvider.notifier).login('rafi@email.com');
+      final chat = container.read(chatProvider.notifier);
+      final id = chat.openForListing(listingId);
+      setUp?.call(chat, id);
+      final router = GoRouter(initialLocation: '/chat/$id', routes: [GoRoute(path: '/chat/:id', builder: (_, s) => ChatScreen(conversationId: s.pathParameters['id']!))]);
+      await tester.pumpWidget(UncontrolledProviderScope(container: container, child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router)));
+      await tester.pumpAndSettle();
+      return (container, id);
+    }
+
+    testWidgets('the "+" opens "Tawar harga makanan" and "Tawar ongkir"; the ongkir sheet sends only the fee', (tester) async {
+      final (container, id) = await openChat(tester, 'l_campur'); // Rp8.000, ongkir Rp3.000
+      expect(find.byType(FluentSendIcon), findsOneWidget, reason: 'the send button is the Fluent paper plane');
+      expect(find.bySemanticsLabel('Kirim pesan'), findsOneWidget);
+      await tester.tap(find.byIcon(LucideIcons.plus));
+      await tester.pumpAndSettle();
+      expect(find.text('Tawar harga makanan'), findsOneWidget);
+      expect(find.text('Harga Rp8.000 per porsi'), findsOneWidget);
+      expect(find.textContaining('Ongkir Rp3.000 ·'), findsOneWidget);
+
+      await tester.tap(find.text('Tawar ongkir'));
+      await tester.pumpAndSettle();
+      for (final chip in ['Rp3.000', 'Rp2.000', 'Rp1.000', 'Gratis']) {
+        expect(find.widgetWithText(AppChip, chip), findsOneWidget);
+      }
+      expect(find.text('Harga makanan tetap Rp8.000 per porsi'), findsOneWidget);
+      expect(find.text('Kirim tawaran ongkir · Rp2.000'), findsOneWidget, reason: 'starts one step below the provider\'s fee');
+
+      await tester.tap(find.widgetWithText(AppChip, 'Rp3.000'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<InkWell>(find.widgetWithText(InkWell, 'Kirim tawaran ongkir · Rp3.000')).onTap, isNull, reason: 'the provider\'s own fee is no offer');
+      await tester.tap(find.widgetWithText(AppChip, 'Rp2.000'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(InkWell, 'Kirim tawaran ongkir · Rp2.000'));
+      await tester.pumpAndSettle();
+
+      final conv = container.read(conversationProvider(id))!;
+      expect((conv.offer!.amount, conv.offer!.deliveryFee), (8000, 2000), reason: 'the food stays at the listed price');
+      expect(conv.status, ThreadStatus.delivering);
+      expect(find.text('Ongkir Rp2.000 disetujui'), findsOneWidget);
+      expect(find.byIcon(LucideIcons.plus), findsNothing, reason: 'reserved: nothing left to haggle');
+    });
+
+    testWidgets('while the provider has not answered: "Batalkan tawaran" is there, the "+" is not, and cancelling brings it back', (tester) async {
+      usePhoneScreen(tester);
+      final container = ProviderContainer(overrides: [...testOverrides(), simulatedOfferDelayProvider.overrideWithValue(const Duration(seconds: 30))]);
+      addTearDown(container.dispose);
+      container.read(sessionProvider.notifier).login('rafi@email.com');
+      final chat = container.read(chatProvider.notifier);
+      final id = chat.openForListing('l_campur');
+      chat.sendOffer(id, 5000);
+      final router = GoRouter(initialLocation: '/chat/$id', routes: [GoRoute(path: '/chat/:id', builder: (_, s) => ChatScreen(conversationId: s.pathParameters['id']!))]);
+      await tester.pumpWidget(UncontrolledProviderScope(container: container, child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router)));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.textContaining('Menunggu jawaban'), findsOneWidget);
+      expect(find.byIcon(LucideIcons.plus), findsNothing, reason: 'one offer at a time: cancel it first');
+      await tester.tap(find.text('Batalkan tawaran'));
+      await tester.pumpAndSettle();
+      expect(find.text('Batalkan tawaranmu?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(AppButton, 'Batalkan tawaran'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(conversationProvider(id))!.offer!.status, OfferStatus.cancelled);
+      expect(find.text('Tawaran dibatalkan'), findsOneWidget);
+      expect(find.byIcon(LucideIcons.plus), findsOneWidget);
+      // The provider's answer was still on its way: it arrives, finds the offer cancelled and does nothing.
+      await tester.pump(const Duration(seconds: 31));
+      expect(container.read(conversationProvider(id))!.offer!.status, OfferStatus.cancelled);
+      expect(container.read(conversationProvider(id))!.pickup, isNull);
+    });
+
+    testWidgets('"Tawar ongkir" is off, with the reason, when the provider does not deliver', (tester) async {
+      await openChat(tester, 'l_ayam2'); // pickup only
+      await tester.tap(find.byIcon(LucideIcons.plus));
+      await tester.pumpAndSettle();
+      expect(find.text('Penyedia belum membuka opsi antar.'), findsOneWidget);
+      await tester.tap(find.text('Tawar ongkir'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kirim tawaran ongkir'), findsNothing, reason: 'the sheet did not open');
+      await tester.tap(find.text('Tawar harga makanan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tulis tawaranmu'), findsOneWidget);
+    });
+
+    testWidgets('after a counter the ongkir sheet starts at the provider\'s ongkir and the food at its counter price', (tester) async {
+      final (container, id) = await openChat(tester, 'l_campur', setUp: (chat, id) => chat.sendOffer(id, 7000, delivery: melati, deliveryFee: 1000));
+      expect(find.text('Maaf, ongkirnya paling rendah Rp2.000 ya.'), findsOneWidget);
+      await tester.tap(find.byIcon(LucideIcons.plus));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tawar ongkir'));
+      await tester.pumpAndSettle();
+      expect(find.text('Harga makanan tetap Rp7.000 per porsi'), findsOneWidget);
+      expect(find.text('Kirim tawaran ongkir · Rp2.000'), findsOneWidget);
+      await tester.tap(find.widgetWithText(InkWell, 'Kirim tawaran ongkir · Rp2.000'));
+      await tester.pumpAndSettle();
+      expect(container.read(conversationProvider(id))!.offer!.status, OfferStatus.accepted);
+      expect(find.text('Tawaran Rp7.000 diterima'), findsOneWidget);
     });
 
     testWidgets('delivery-only food: "Ambil sendiri" is off and the button already counts the fee', (tester) async {

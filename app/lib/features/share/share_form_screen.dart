@@ -55,6 +55,10 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
   /// Null until picked when the AI could not tell the category.
   FoodCategory? _category;
   var _portions = 2;
+
+  /// "Kemasan". Sealed food is always wrapped, so the control is hidden for it ([_packagingNow]).
+  var _packaging = Packaging.dibungkus;
+  Packaging get _packagingNow => _category == FoodCategory.sealedFood ? Packaging.dibungkus : _packaging;
   var _free = false;
   var _negotiable = true;
 
@@ -170,6 +174,7 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
             recipe: _category == FoodCategory.bahanMentah ? _recipe : null,
             deliveryFee: _delivery ? _deliveryFee : null,
             allowsPickup: _pickup,
+            packaging: _packagingNow,
             photoPath: capture.photoPath,
             aiConfidence: aiResult.confidence,
             aiStatus: aiResult.verdict == AiVerdict.approved ? AiStatus.approved : AiStatus.pendingReview,
@@ -340,14 +345,13 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
     );
   }
 
-  /// A photo the AI turned down (retake, not food, spoilage) or could not check: what happened and how to go on.
+  /// A photo the AI turned down (retake, not food) or could not check: what happened and how to go on.
   Widget _problem(ShareCapture capture) {
     final r = capture.result;
     final failed = r == null;
-    final signs = r?.visibleSigns ?? const <String>[];
     final text = failed
         ? '${validationFailureText(capture.failure)} Foto belum dianggap lolos.'
-        : [r.message ?? msgNotFood, if (signs.isNotEmpty) 'Terlihat: ${signs.join(', ')}.'].join('\n');
+        : r.message ?? msgNotFood;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       InfoBox(
         text,
@@ -375,7 +379,7 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
     final result = capture?.result;
     final pending = result?.verdict == AiVerdict.pendingReview;
     final checked = capture != null && capture.eligible;
-    final notes = [...?result?.visibleSigns, ...?result?.warnings];
+    final notes = result?.warnings ?? const <String>[];
     // The reason is only worth repeating when it says more than "Foto lolos validasi".
     final reason = pending ? result?.message : null;
 
@@ -477,6 +481,24 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                     Expanded(child: Text('Sisa berapa porsi?', style: AppTypography.display(17, weight: 700))),
                     QtyStepper(value: _portions, max: 50, onChanged: (v) => setState(() => _portions = v)),
                   ]),
+                  if (_category != FoodCategory.sealedFood) ...[
+                    const SizedBox(height: 16),
+                    Text('Kemasan', style: AppTypography.display(17, weight: 700)),
+                    const SizedBox(height: 8),
+                    SegmentedControl(
+                      options: [for (final p in Packaging.values) p.label],
+                      selected: _packaging.index,
+                      onChanged: (i) => setState(() {
+                        _packaging = Packaging.values[i];
+                        if (_packaging == Packaging.wadahSendiri) _delivery = false; // food in the receiver's own container is not delivered
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _packaging == Packaging.wadahSendiri ? 'Penerima diminta membawa wadah bersih sendiri. Hemat kemasan sekali pakai.' : 'Sudah dibungkus, penerima tinggal membawa pulang.',
+                      style: AppTypography.text(13, color: AppColors.inkMuted),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Text('Pilihan sehat', style: AppTypography.display(17, weight: 700)),
                   const SizedBox(height: 4),
@@ -539,7 +561,8 @@ class _ShareFormScreenState extends ConsumerState<ShareFormScreen> {
                     value: _delivery,
                     label: 'Bisa diantar (< 1 km)',
                     textSize: 15,
-                    helper: 'Kamu antar sendiri ke penerima',
+                    enabled: _packagingNow == Packaging.dibungkus,
+                    helper: _packagingNow == Packaging.dibungkus ? 'Kamu antar sendiri ke penerima' : 'Antar hanya untuk makanan yang sudah dibungkus.',
                     onChanged: (v) => setState(() => _delivery = v),
                   ),
                   // Shown as soon as both are off; "Bagikan sekarang" refuses it too.

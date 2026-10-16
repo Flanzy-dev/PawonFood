@@ -13,8 +13,6 @@ Map<String, Object?> answer([Map<String, Object?> overrides = const {}]) => {
       'is_food': true,
       'category': 'makanan_matang',
       'food_name': 'Ayam goreng',
-      'visual_condition': 'no_visible_issues',
-      'visible_signs': <String>[],
       'image_quality': 'good',
       'warnings': <String>[],
       'listing_eligible': true,
@@ -36,14 +34,10 @@ void main() {
     });
 
     test('each decision maps to a verdict, and only approved / pending are eligible', () {
-      expect(parseCloudValidation(answer({'decision': 'pending_review', 'visual_condition': 'minor_concerns', 'visible_signs': ['daun sedikit layu']})).verdict, AiVerdict.pendingReview);
+      expect(parseCloudValidation(answer({'decision': 'pending_review', 'category': 'kue_basah'})).verdict, AiVerdict.pendingReview);
       final retake = parseCloudValidation(answer({'decision': 'retake', 'listing_eligible': false, 'image_quality': 'blurry'}));
       expect(retake.verdict, AiVerdict.retake);
       expect(retake.eligible, isFalse);
-      final spoiled = parseCloudValidation(answer({'decision': 'rejected', 'listing_eligible': false, 'visual_condition': 'visible_spoilage', 'visible_signs': ['jamur hijau']}));
-      expect(spoiled.verdict, AiVerdict.rejected);
-      expect(spoiled.visualCondition, VisualCondition.visibleSpoilage);
-      expect(spoiled.visibleSigns, ['jamur hijau']);
       final notFood = parseCloudValidation(answer({'is_food': false, 'category': 'bukan_makanan', 'food_name': null, 'decision': 'rejected', 'listing_eligible': false}));
       expect(notFood.category, isNull);
       expect(notFood.eligible, isFalse);
@@ -93,9 +87,7 @@ void main() {
         answer({'listing_eligible': false}), // contradicts "approved"
         answer({'decision': 'rejected'}), // eligible but rejected
         answer({'is_food': false}), // non-food marked eligible
-        answer({'visual_condition': 'fresh'}),
         answer({'image_quality': null}),
-        answer({'visible_signs': 'jamur'}),
         answer({'warnings': [1]}),
         answer({'food_name': 42}),
         answer({'reason': null}),

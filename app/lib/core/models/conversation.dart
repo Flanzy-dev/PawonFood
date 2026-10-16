@@ -25,7 +25,7 @@ class Delivery {
 }
 
 class Offer {
-  const Offer({required this.id, required this.listingId, required this.receiverId, required this.amount, this.portions = 1, this.status = OfferStatus.pending, this.delivery});
+  const Offer({required this.id, required this.listingId, required this.receiverId, required this.amount, this.portions = 1, this.status = OfferStatus.pending, this.delivery, this.counter, this.counterFee});
 
   final String id;
   final String listingId;
@@ -37,12 +37,27 @@ class Offer {
   /// Null for "Ambil sendiri". Picked on the detail screen before the offer or "Ambil", and fixed once reserved.
   final Delivery? delivery;
 
-  /// What the food comes to: [amount] is per porsi. The delivery fee is on top ([deliveryFee]).
+  /// The provider's lowest price per porsi after turning this offer down ("Maaf, paling rendah RpX ya."); null otherwise.
+  final int? counter;
+
+  /// The delivery fee that goes with [counter] ("ongkirnya Rp1.000"); null for pickup.
+  final int? counterFee;
+
+  /// What the food comes to: [amount] is per porsi. The delivery fee is on top ([deliveryFee]): the provider's fee, or
+  /// the lower one the receiver offered.
   int get total => amount * portions;
   int get deliveryFee => delivery?.fee ?? 0;
 
-  Offer copyWith({OfferStatus? status, int? amount}) => Offer(
-      id: id, listingId: listingId, receiverId: receiverId, amount: amount ?? this.amount, portions: portions, status: status ?? this.status, delivery: delivery);
+  Offer copyWith({OfferStatus? status, int? amount, int? counter, int? counterFee}) => Offer(
+      id: id,
+      listingId: listingId,
+      receiverId: receiverId,
+      amount: amount ?? this.amount,
+      portions: portions,
+      status: status ?? this.status,
+      delivery: delivery,
+      counter: counter ?? this.counter,
+      counterFee: counterFee ?? this.counterFee);
 }
 
 /// The reservation behind an accepted offer or an "Ambil". There is no code to read out: the provider shows a QR

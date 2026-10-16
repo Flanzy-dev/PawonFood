@@ -25,6 +25,17 @@ OfferDecision decideOffer({required int price, required int amount, required boo
   return OfferCountered(max(counter, 500).clamp(0, price).toInt());
 }
 
+/// The simulated provider on an offered delivery fee: half the fee or more is fine (null), lower gets a counter at about
+/// 60% of the fee, rounded to Rp1.000 (Rp2.000 -> Rp1.000, Rp3.000 -> Rp2.000).
+int? counterDeliveryFee({required int fee, required int offered}) {
+  if (offered * 2 >= fee) return null;
+  return (((fee * 0.6) / 1000).round() * 1000).clamp(offered, fee).toInt();
+}
+
+/// "Tawar ongkir" choices for a provider's fee: the fee, then down in Rp1.000 steps to Rp0 (Rp3.000 -> 3.000, 2.000,
+/// 1.000, 0). Free delivery has nothing to haggle.
+List<int> deliveryFeeOffers(int fee) => fee <= 0 ? const [] : [for (var f = fee; f > 0; f -= 1000) f, 0];
+
 /// "Tawar cepat" amounts for a price: about 60% and 80%, rounded to Rp500, strictly between 0 and the price.
 /// (Rp5.000 -> Rp3.000 and Rp4.000.)
 List<int> quickOffers(int price) {

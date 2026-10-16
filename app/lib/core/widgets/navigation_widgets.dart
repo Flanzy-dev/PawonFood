@@ -7,11 +7,13 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'brand.dart';
 
-/// Circular 44pt icon button (back, close, flash, locate...).
+/// Circular 44pt icon button (back, close, flash, locate...). Takes a Lucide [icon], or an [iconWidget] for icons that
+/// are drawn from SVG (the Fluent send icon of the chat composer).
 class RoundIconButton extends StatelessWidget {
   const RoundIconButton({
     super.key,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.onTap,
     required this.semanticLabel,
     this.fill = AppColors.surface,
@@ -19,9 +21,10 @@ class RoundIconButton extends StatelessWidget {
     this.iconColor = AppColors.ink,
     this.size = 44,
     this.shadow = false,
-  });
+  }) : assert((icon == null) != (iconWidget == null), 'Give either icon or iconWidget');
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final VoidCallback? onTap;
   final String semanticLabel;
   final Color fill;
@@ -43,7 +46,7 @@ class RoundIconButton extends StatelessWidget {
               color: fill,
               shape: CircleBorder(side: borderColor == null ? BorderSide.none : BorderSide(color: borderColor!)),
               clipBehavior: Clip.antiAlias,
-              child: InkWell(onTap: onTap, child: SizedBox(width: size, height: size, child: Icon(icon, size: 24, color: iconColor))),
+              child: InkWell(onTap: onTap, child: SizedBox(width: size, height: size, child: Center(child: iconWidget ?? Icon(icon, size: 24, color: iconColor)))),
             ),
           ),
         ),

@@ -4,8 +4,8 @@ import { decide } from './rules.js';
 import { parseModelOutput } from './schema.js';
 
 /**
- * @returns {Promise<{is_food: boolean, category: string, food_name: string|null, description: string|null, visual_condition: string,
- *   visible_signs: string[], image_quality: string, warnings: string[], listing_eligible: boolean,
+ * @returns {Promise<{is_food: boolean, category: string, food_name: string|null, description: string|null,
+ *   image_quality: string, warnings: string[], listing_eligible: boolean,
  *   decision: 'approved'|'pending_review'|'retake'|'rejected', reason: string}>}
  */
 export async function validateFood(image, provider) {

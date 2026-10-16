@@ -17,22 +17,20 @@ test('non-food is rejected, whatever else the model says', () => {
   assert.equal(decide(observation({ is_food: false, image_quality: 'blurry' })).reason, REASONS.notFood);
 });
 
-test('poor image quality asks for a retake before any condition call is trusted', () => {
+test('poor image quality asks for a retake', () => {
   for (const q of ['blurry', 'too_dark', 'obstructed', 'too_far']) {
-    const r = decide(observation({ image_quality: q, visual_condition: 'visible_spoilage' }));
+    const r = decide(observation({ image_quality: q }));
     assert.equal(r.decision, 'retake', q);
     assert.equal(r.listing_eligible, false);
     assert.equal(r.reason, REASONS[q]);
   }
-  assert.equal(decide(observation({ visual_condition: 'cannot_assess' })).decision, 'retake');
 });
 
-test('visible spoilage is rejected', () => {
-  const r = decide(observation({ visual_condition: 'visible_spoilage', visible_signs: ['jamur hijau'] }));
-  assert.deepEqual(r, { decision: 'rejected', listing_eligible: false, reason: REASONS.spoilage });
-});
-
-test('unknown category and minor concerns go to review, still eligible', () => {
+test('unknown category goes to review, still eligible', () => {
   assert.deepEqual(decide(observation({ category: 'unknown' })), { decision: 'pending_review', listing_eligible: true, reason: REASONS.unknownCategory });
-  assert.deepEqual(decide(observation({ visual_condition: 'minor_concerns' })), { decision: 'pending_review', listing_eligible: true, reason: REASONS.minorConcerns });
+});
+
+test('the decision ignores everything except is_food, category and image_quality', () => {
+  const plain = decide(observation());
+  assert.deepEqual(decide(observation({ warnings: ['jamur putih'], description: 'Roti berjamur.', food_name: 'Roti', health_signals: ['protein'] })), plain);
 });

@@ -32,6 +32,7 @@ class Listing {
     this.fypItem,
     this.deliveryFee,
     this.allowsPickup = true,
+    this.packaging = Packaging.dibungkus,
   });
 
   final String id;
@@ -83,6 +84,10 @@ class Listing {
   /// [deliveryFee].
   final bool allowsPickup;
 
+  /// "Kemasan": already wrapped, or the receiver brings a container. [Packaging.wadahSendiri] never has a [deliveryFee].
+  final Packaging packaging;
+
+  bool get bringsContainer => packaging == Packaging.wadahSendiri;
   bool get isFree => price == 0;
 
   /// The receiver can pick "Minta diantar" (PRD Handover methods).
@@ -123,6 +128,7 @@ class Listing {
         fypItem: fypItem,
         deliveryFee: deliveryFee,
         allowsPickup: allowsPickup,
+        packaging: packaging,
       );
 
   /// Builds a listing from mock JSON. Times are relative to [now] so the data never goes stale.
@@ -150,5 +156,6 @@ class Listing {
         fypItem: j['fypItem'] as String?,
         deliveryFee: (j['deliveryFee'] as num?)?.toInt(),
         allowsPickup: (j['pickup'] ?? true) as bool,
+        packaging: Packaging.fromKey(j['packaging']),
       );
 }

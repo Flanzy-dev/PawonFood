@@ -126,8 +126,11 @@ States for every interactive component: default, pressed, focused, disabled, loa
   step: "Pilih cara bayar" (+ "Lihat rute") until a payment method is chosen, then "Pindai QR" (+ "Lihat rute"), with
   a dark "Lunas" tag when paid by QRIS. The provider sees "Buka QR ambil". No pickup code.
 - *Waiting card*: tint panel "Menunggu jawaban [penyedia]" with "Batalkan tawaran" while an offer is pending.
-- *Quick replies*: outlined pills (Saya OTW / Masih ada? / Tawar lagi).
-- *Composer*: rounded input and a green circular send button.
+- *Quick replies*: outlined pills (Saya OTW / Masih ada? / Bisa diantar?).
+- *Declined card*: tint panel "Tawaranmu belum diterima" with the provider's lowest price, a green "Tawar Rp… · ongkir Rp…"
+  button and an accent-outline "Tawar lagi" button.
+- *Composer*: a round outlined "+" (only while the user can still haggle) that opens the "Tawar" sheet (Tawar harga
+  makanan / Tawar ongkir), the rounded input, and a green circular send button with the fluent:send-16-filled icon.
 - *Thread row*: avatar, name, time, item · price, last message, plus a status label (Tawaran diterima / Siap diambil / Habis).
 - *Safety banner*: muted note about not transferring money outside the app.
 
@@ -210,26 +213,26 @@ confetti, parallax or decoration loops. Tokens live in `app/lib/core/motion/moti
 
 ## Landing page
 
-Sections of `PawonFood UI.pdf`, from top to bottom:
+Built in `/web` (Next.js). Sections of `PawonFood UI.pdf`, from top to bottom, with the 2026-10-16 audit changes:
 
-1. **Nav**: logo; Cara kerja, Keamanan pangan, Untuk warung, Tentang; pill CTA "Unduh aplikasi".
-2. **Hero** on `--primary-dark`:
-   - Eyebrow "Dari dapur ke komunitas · Yogyakarta".
-   - Display headline "Masak kebanyakan? Bagikan, jangan buang." and a short explanation paragraph.
+1. **Nav**: logo; Cara kerja, Keamanan pangan, Untuk penyedia, Tentang (each links to a real section); pill CTA "Unduh aplikasi". Hamburger menu below 900 px.
+2. **Hero** on `--primary-dark` with a wood-grain texture:
+   - Eyebrow "Hyperlocal Community Food Rescue Platform".
+   - Display headline "Masak kebanyakan? Bagikan, jangan buang." and a short paragraph that mentions pickup or delivery.
    - CTAs "Unduh aplikasi" / "Daftar jadi penyedia" with the line "Setiap foto makanan dicek AI sebelum tayang".
-   - Phone mockup of the home screen.
-3. **Mission statement**: "...dimulai dari satu porsi yang tidak jadi dibuang."
-4. **Kenapa pakai PawonFood**: 4 benefits (Murah atau gratis, Cukup jalan kaki, Harga bisa ditawar, Fotonya asli),
-   followed by a food marquee (Nasi rames ● Gorengan ● Sayur lodeh ● ...).
-5. **Cara kerja**: "Satu aplikasi, dua sisi dapur", with two 3-step columns:
-   *Kalau kamu lapar* and *Kalau kamu masak kebanyakan*.
-6. **Yang membuat PawonFood berbeda**: numbered 01–03 (Dapur rumah ikut berbagi, Harga fleksibel, Keamanan dicek AI).
-7. **Untuk warung, katering, dan ibu kos**:
-   - Headline "Sisa dagangan jadi pemasukan, bukan sampah".
-   - 3 benefits (jual sisa, tampil teratas, sertifikat) and the CTA "Daftarkan warungmu".
-   - Photo placeholders.
-8. **Final CTA**: "Dari dapur ke komunitas, dalam jarak jalan kaki." with App Store / Google Play buttons.
-9. **Footer**: Produk / Mitra / Tentang link columns, © 2026 PawonFood.
+   - Phone mockup of the current Beranda (drawn in HTML/CSS) with two floating chips.
+3. **Mission statement** (Tentang): "...dimulai dari satu porsi yang tidak jadi dibuang."
+4. **Data band** "Kenapa ini penting": 23–48 juta ton, 5–19 juta ton, 80% from households (Bappenas 2021).
+5. **Kenapa pakai PawonFood**: 4 benefits (Gratis/harga tetap/tawar, Jalan kaki atau diantar, Ambil dengan QR, Poin dampak), then a food marquee.
+6. **Cara kerja**: "Satu aplikasi, dua sisi dapur", two 3-step columns: *Kalau kamu lapar* and *Kalau kamu masak kebanyakan*.
+7. **Yang membuat PawonFood berbeda**: comparison table (category columns, no brand names): household sellers, no MoU, no commission, pickup or delivery, negotiable price, QR handover.
+8. **Keamanan pangan**: camera-only photos checked by AI, pickup deadline with QR, open ratings with suspension; plus the "tempat bertemunya penjual dan pembeli" disclaimer.
+9. **Untuk penyedia** ("Untuk dapur rumah, warung, dan katering"): tanpa MoU dan tanpa komisi, cukup foto, Sertifikat Dapur/Resto Peduli Lingkungan; CTA "Daftar jadi penyedia"; kitchen watercolour.
+10. **Story band** on tan: "Dari dapur ke dapur, dalam jarak jalan kaki." with the hand-over watercolour. Text is `--ink` (cream on tan is only 2.1:1).
+11. **Final CTA** "Mulai dari Pogung. Lalu seluruh Jogja." with App Store / Google Play buttons (links not set yet).
+12. **Footer**: Produk / Mitra / Tentang link columns, © 2026 PawonFood, photo credits. The contact line shows only when `contactEmail` is set.
+
+Wood texture: a grayscale tile (`public/textures/wood.jpg`, cut from the Figma render) blended with `overlay` over a flat green. The flat greens (hero `#3c6346`, Cara kerja `#324c37`, final CTA `#426a4c`) are measured from the Figma design, which renders lighter than the PDF.
 
 ## Responsive
 

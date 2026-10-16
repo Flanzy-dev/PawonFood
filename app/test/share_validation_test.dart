@@ -151,17 +151,6 @@ void main() {
       expect(find.text('Tips foto'), findsOneWidget, reason: 'back to the shutter controls');
     });
 
-    testWidgets('visible spoilage is rejected with what the AI saw', (tester) async {
-      final validator = ScriptedValidator([
-        const ValidationResult(verdict: AiVerdict.rejected, message: msgSpoiled, visualCondition: VisualCondition.visibleSpoilage, visibleSigns: ['jamur hijau di tepi roti']),
-      ]);
-      await pumpShare(tester, overrides: [cameraFactoryProvider.overrideWithValue(FakeCamera.new), foodValidatorProvider.overrideWithValue(validator)]);
-      await shoot(tester);
-      expect(find.text('Foto tidak bisa dipakai'), findsOneWidget);
-      expect(find.textContaining('Terlihat: jamur hijau di tepi roti.'), findsOneWidget);
-      expect(find.text('Foto belum lolos'), findsOneWidget);
-    });
-
     testWidgets('a failed check is never treated as passed; "Coba lagi" re-checks the same photo', (tester) async {
       final camera = FakeCamera();
       final validator = ScriptedValidator([const ValidationUnavailable(ValidationFailure.timeout), approved]);
@@ -262,15 +251,53 @@ void main() {
         suggestedHealthTags: {HealthTag.sayurBuah, HealthTag.tidakDigoreng},
       );
       final c = await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: result));
+      await tester.scrollUntilVisible(find.text('Pilihan sehat'), 100, scrollable: find.byType(Scrollable).first);
       expect(find.text('Pilihan sehat'), findsOneWidget);
       expect(find.text('Ditandai otomatis oleh AI. Ubah kalau kurang tepat.'), findsOneWidget);
       expect(find.text('Ide resep'), findsNothing, reason: 'recipes are for fresh ingredients only');
+      await tester.ensureVisible(find.text('Protein')); // clear of the sticky bar
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Protein')); // add one the AI did not see
       await tester.tap(find.text('Tidak digoreng')); // remove one
       await tester.pumpAndSettle();
       await tester.tap(find.text('Bagikan sekarang'));
       await tester.pumpAndSettle();
       expect(c.read(listingsProvider).first.healthTags, {HealthTag.sayurBuah, HealthTag.protein});
+    });
+
+    testWidgets('"Bawa wadah sendiri" turns "Bisa diantar" off and is published', (tester) async {
+      const result = ValidationResult(verdict: AiVerdict.approved, category: FoodCategory.makananMatang, suggestedName: 'Sayur lodeh');
+      final c = await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: result));
+      final scroll = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(find.text('Bisa diantar (< 1 km)'), 100, scrollable: scroll);
+      await tester.ensureVisible(find.text('Bisa diantar (< 1 km)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bisa diantar (< 1 km)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ongkir'), findsOneWidget, reason: 'delivery on for wrapped food');
+
+      await tester.scrollUntilVisible(find.text('Bawa wadah sendiri'), -100, scrollable: scroll);
+      await tester.ensureVisible(find.text('Bawa wadah sendiri'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bawa wadah sendiri'));
+      await tester.pumpAndSettle();
+      expect(find.text('Penerima diminta membawa wadah bersih sendiri. Hemat kemasan sekali pakai.'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Antar hanya untuk makanan yang sudah dibungkus.'), 100, scrollable: scroll);
+      expect(find.text('Ongkir'), findsNothing, reason: 'delivery was turned off');
+
+      await tester.ensureVisible(find.text('Bagikan sekarang'));
+      await tester.tap(find.text('Bagikan sekarang'));
+      await tester.pumpAndSettle();
+      final l = c.read(listingsProvider).first;
+      expect((l.packaging, l.canDeliver), (Packaging.wadahSendiri, false));
+    });
+
+    testWidgets('sealed food has no Kemasan choice', (tester) async {
+      const result = ValidationResult(verdict: AiVerdict.approved, category: FoodCategory.sealedFood, suggestedName: 'Roti');
+      await pumpForm(tester, const ShareCapture(photoPath: 'p.jpg', result: result));
+      await tester.scrollUntilVisible(find.text('Pilihan sehat'), 100, scrollable: find.byType(Scrollable).first);
+      expect(find.text('Kemasan'), findsNothing);
+      expect(find.text('Bawa wadah sendiri'), findsNothing);
     });
 
     testWidgets('fresh ingredients show recipe ideas from the name; the chosen recipe is published', (tester) async {

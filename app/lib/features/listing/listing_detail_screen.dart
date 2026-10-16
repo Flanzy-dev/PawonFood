@@ -25,6 +25,7 @@ import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/info_blocks.dart';
+import '../../core/widgets/info_box.dart';
 import '../../core/widgets/layout_widgets.dart';
 import '../../core/widgets/listing_photo.dart';
 import '../../core/widgets/navigation_widgets.dart';
@@ -104,11 +105,11 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     _open('/chat/${ref.read(chatProvider.notifier).claim(l.id, delivery: _deliveryFor(l))}');
   }
 
-  void _offer(Listing l, int amount, {int portions = 1, String message = '', Delivery? delivery}) {
+  void _offer(Listing l, int amount, {int portions = 1, String message = '', Delivery? delivery, int? deliveryFee}) {
     if (_busy) return;
     final chat = ref.read(chatProvider.notifier);
     final id = chat.openForListing(l.id);
-    final error = chat.sendOffer(id, amount, portions: portions, message: message, delivery: delivery);
+    final error = chat.sendOffer(id, amount, portions: portions, message: message, delivery: delivery, deliveryFee: deliveryFee);
     if (error != null) {
       showAppSnack(context, error);
       return;
@@ -118,7 +119,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 
   Future<void> _customOffer(Listing l) async {
     final draft = await showOfferSheet(context, listing: l, address: _address, delivery: _deliveryFor(l) != null);
-    if (draft != null && mounted) _offer(l, draft.amount, portions: draft.portions, message: draft.message, delivery: draft.delivery);
+    if (draft != null && mounted) _offer(l, draft.amount, portions: draft.portions, message: draft.message, delivery: draft.delivery, deliveryFee: draft.deliveryFee);
   }
 
   @override
@@ -231,6 +232,8 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                           ],
                         ),
                         ),
+                        const SizedBox(height: 12),
+                        PackagingNote(l.packaging),
                         if (l.healthTags.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           Text('Pilihan sehat', style: AppTypography.display(16, weight: 700, height: 22)),

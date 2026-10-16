@@ -22,6 +22,24 @@ enum FoodCategory {
   static FoodCategory fromKey(String key) => values.firstWhere((c) => c.key == key, orElse: () => makananMatang);
 }
 
+/// How the food is handed over: already wrapped, or the receiver brings a clean container of their own (less single-use
+/// packaging). Independent of [FoodCategory]; sealed food is always wrapped, and food that needs a container is never delivered.
+enum Packaging {
+  dibungkus('dibungkus', 'Sudah dibungkus', 'Bisa langsung dibawa pulang'),
+  wadahSendiri('wadah_sendiri', 'Bawa wadah sendiri', 'Siapkan wadah bersih untuk makanan ini');
+
+  const Packaging(this.key, this.label, this.hint);
+  final String key;
+
+  /// Segment, filter chip and detail title.
+  final String label;
+
+  /// Second line of the detail row.
+  final String hint;
+
+  static Packaging fromKey(Object? key) => values.firstWhere((p) => p.key == key, orElse: () => dibungkus);
+}
+
 /// What a dish contains or how it was cooked, tagged by the provider (the AI pre-fills what it can see).
 /// Describes composition only: never a health or safety claim.
 enum HealthTag {

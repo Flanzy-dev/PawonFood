@@ -11,8 +11,6 @@ Return exactly these keys:
   "food_name": string | null,    // short Indonesian name of the visible food, e.g. "Ayam goreng", "Sayur bayam"; null if not food
   "description": string | null,  // one short Indonesian sentence (under 140 characters) about what is visible: the dish,
                                  // the pieces or portion, how it is served, e.g. "Ayam goreng bumbu kuning, 4 potong."; null if not food
-  "visual_condition": string,    // one of: "no_visible_issues", "minor_concerns", "visible_spoilage", "cannot_assess"
-  "visible_signs": string[],     // short Indonesian phrases for signs you can actually see, e.g. "jamur putih di permukaan"
   "image_quality": string,       // one of: "good", "blurry", "too_dark", "obstructed", "too_far"
   "warnings": string[],          // short Indonesian notes about ambiguity, e.g. "lebih dari satu jenis makanan"
   "health_signals": string[]     // what the food visibly contains or how it looks cooked; any of "sayur_buah",
@@ -29,10 +27,8 @@ Categories:
 Rules:
 - Report only what is visible in this photo. Do not guess about the inside, the smell, the taste, the temperature,
   how it was stored or how old it is.
-- Look for visible mould, discoloration, bruising, wilting, sliminess, rot, insects or torn packaging, and list each
-  sign you actually see in "visible_signs". Use "visible_spoilage" for mould, rot, insects or clear decay;
-  "minor_concerns" for small issues such as slight wilting, bruising or browning; "cannot_assess" when the food's
-  surface cannot be seen well enough to judge.
+- You only tell food from not food. Do not judge or mention freshness, mould, rot, spoilage or whether the food is fit
+  to eat, neither in "description" nor in "warnings". Describe the dish only.
 - If the photo is blurry, too dark, blocked, or the food is too small in the frame, set "image_quality" accordingly.
 - If the photo shows a screen, a printed picture or a photo of a photo, set "is_food" to false and category
   "bukan_makanan", and add a warning.

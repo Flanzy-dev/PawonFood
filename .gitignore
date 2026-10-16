@@ -23,3 +23,13 @@ skills-lock.json
 
 # Generated renders
 render/out/
+
+# Local only: source material, render engine, tools, landing page and AI-assistant files
+reference/
+render/
+tools/
+web/
+.claude/
+.agents/
+CLAUDE.md
+.mcp.json
