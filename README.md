@@ -35,7 +35,6 @@ Photos can only come from the live camera, not the gallery, so people can't post
 | Mobile app ([`app/`](app/)) | MVP complete. All 75 hi-fi Figma screens are built, the full flow runs on mock data, and 74 tests pass. |
 | Feed ranking | Runs on the device. Reorders the feed using taps and view time. |
 | Photo check | Simulated behind the `FoodValidator` interface. The real YOLOv8 → TFLite model is still in progress. |
-| Landing page ([`web/`](web/)) | Built with Next.js and TypeScript (single static page, Indonesian copy). Store links and the contact email are not set yet; see [web/README.md](web/README.md). |
 | ML (`ml/`) | In progress. Python, YOLOv8 exported to TFLite. |
 | Backend | None yet. All data is mocked in memory. Supabase is planned (see [ARCHITECTURE.md](ARCHITECTURE.md)). |
 
